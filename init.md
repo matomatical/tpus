@@ -106,7 +106,7 @@ However, I later realised I didn't want to `do-release-upgrade` and I should
 just recreate the cluster instead...
 
 Installing Python 3.14
-------------------------------
+----------------------
 
 Installing a newer version of python
 ([guide](https://tecadmin.net/how-to-install-python-3-14-on-ubuntu/)).
