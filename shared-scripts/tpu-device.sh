@@ -14,7 +14,7 @@ if [[ ! "$DEVICE_ID" =~ ^[0-3]$ ]]; then
     exit 1
 fi
 
-export TPU_CHIPS_PER_PROCESS_BOUNDS=2,2,1
+export TPU_CHIPS_PER_PROCESS_BOUNDS=1,1,1
 export TPU_PROCESS_BOUNDS=1,1,1
 export TPU_VISIBLE_DEVICES=$DEVICE_ID
 

@@ -33,7 +33,7 @@ SSH config
 Create a key (if haven't already):
 
 ```
-ssh-keygen -t ed25519 -f ~/.ssh/mfr-tpu -C matt
+ssh-keygen -t ed25519 -f ~/.ssh/mfr-tpus -C matt
 ```
 
 Add key to cluster with GCP console (compute > metadata > ssh keys).
@@ -122,6 +122,7 @@ Make 3.14 the default.
 
 ```
 sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.14 314
+sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 310
 sudo update-alternatives --config python3 # only one alternative, not needed!
 ```
 
@@ -132,6 +133,12 @@ sudo apt install python3.14-venv
 sudo python3.14 -m ensurepip --upgrade --default-pip
 sudo python3.14 -m pip install --upgrade pip
 sudo pip install uv
+```
+
+Fix some incompatible things
+
+```
+sudo apt remove command-not-found
 ```
 
 Installing other system packages
@@ -200,11 +207,20 @@ sudo ./adduser.sh afiq AAAAC3NzaC1lZDI1NTE5AAAAINmp4YYoMgXP8MEQsMjkla+o81pwI7hj9
 TPU logging permission
 ----------------------
 
-???
+The first time a user runs something on the TPUs, for some reason it claims the
+tpu logs and subsequent users get lots of warnings.
 
-### Trouble: TPU training spits lots of warnings?
+Use the TPUs to create log folder:
 
-This seemed to work last time?
+```
+uv venv venv
+source venv/bin/activate
+uv pip install "jax[tpu]"
+tpu-device 0 python -c "import jax; print(jax.devices())"
+rm -rf venv
+```
+
+Reset log folder ownership:
 
 ```
 sudo chown -R tpu-runtime:tpu-runtime /tmp/tpu_logs/
@@ -223,8 +239,40 @@ limit their size.
 
 https://linuxhandbook.com/clear-systemd-journal-logs/
 
+Configuring my GitHub
+---------------------
+
+On my local machine:
+
+```
+ssh-keygen -t ed25519 -f ~/.ssh/mfr-tpus-gh -C "m@far.in.net"
+```
+
+Don't forget to add it to my github profile.
+
+Then copy to each TPU VM:
+
+```
+for t in 0 1 2 3; do scp mfr-tpus-gh{,.pub} tpu$t:.ssh; done
+```
+
+Then on each machine, add it to the ssh agent:
+
+```
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/mfr-tpus-gh
+```
+
+Should work?
+
 TODO
 -----
+
+Make myself at home:
+
+* Zsh instead of bash
+* Neovim instead of vim
+* Copy dotfiles
 
 External storage:
 
