@@ -239,6 +239,53 @@ limit their size.
 
 https://linuxhandbook.com/clear-systemd-journal-logs/
 
+Configuring intra-cluster keys
+----------------------------
+
+Locally:
+
+```
+ssh-keygen -t ed25519 -f ~/.ssh/mfr-tpus-all -C "m@far.in.net"
+for t in 0 1 2 3; do scp ~/.ssh/mfr-tpus-all{,.pub} tpu$t:.ssh; done
+```
+
+On each machine:
+
+```
+cat ~/.ssh/mfr-tpus-all.pub >> ~/.ssh/authorized_keys
+```
+
+Save this as `~/.ssh/config`:
+
+```
+
+# MFR's tiny TPU cluster
+Host tpu0 tpu1 tpu2 tpu3
+    IdentityFile ~/.ssh/mfr-tpus-all
+    User matt
+Host tpu0
+    HostName 10.130.0.12
+Host tpu1
+    HostName 10.130.0.11
+Host tpu2
+    HostName 10.130.0.10
+Host tpu3
+    HostName 10.130.0.13
+```
+
+### Trouble: Bad configuration option
+
+For some very weird reason, the ssh tool on the TPUs doesn't see the first byte
+of the config file. This often led me to a parse error. The above has an empty
+line as the first byte which seems to fix it.
+
+I confirmed there were no weird bytes with `od -c ~/.ssh/config`.
+
+Gemini guesses this is a bug in the SSH version bundled with the image. I guess
+I think that's unlikely because I think the SSH version is up to date?
+
+Anyway it doesn't seem to be a wider problem so I'll just leave it...
+
 Configuring my GitHub
 ---------------------
 
@@ -253,7 +300,7 @@ Don't forget to add it to my github profile.
 Then copy to each TPU VM:
 
 ```
-for t in 0 1 2 3; do scp mfr-tpus-gh{,.pub} tpu$t:.ssh; done
+for t in 0 1 2 3; do scp ~/.ssh/mfr-tpus-gh{,.pub} tpu$t:.ssh; done
 ```
 
 Then on each machine, add it to the ssh agent:
@@ -265,7 +312,7 @@ ssh-add ~/.ssh/mfr-tpus-gh
 
 Should work?
 
-TODO
+TODO: Home set-up
 -----
 
 Make myself at home:
@@ -274,7 +321,24 @@ Make myself at home:
 * Neovim instead of vim
 * Copy dotfiles
 
+TODO: External persistent storage
+---------------------------------
+
 External storage:
 
 * Persistent disk?
 * GCS FUSE?
+
+TODO: Job management
+--------------------
+
+See this discussion with gemini for hq configuration:
+
+* https://gemini.google.com/share/379ddb7d8ea9
+
+Plan:
+
+* Provision maybe 14/16 nodes in this queue (save one or two for interactive
+  use?)
+* Needs a persistent disk for script and data storage.
+
