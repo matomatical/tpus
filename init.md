@@ -41,7 +41,7 @@ Add key to cluster with GCP console (compute > metadata > ssh keys).
 
 Configure `~/.ssh/config` (get IP addresses from GCP console):
 
-```
+```ssh_config
 # MFR's tiny TPU cluster
 Host tpu0 tpu1 tpu2 tpu3
     IdentityFile ~/.ssh/mfr-tpus
@@ -150,6 +150,12 @@ Other packages I want installed globally:
 sudo apt install zsh neovim
 ```
 
+Other packages (currently only installed on TPU0):
+
+```
+sudo apt install ffmpeg
+```
+
 Installing custom scripts
 -------------------------
 
@@ -177,6 +183,8 @@ chmod +x /home/shared/tpups.py
 sudo ln -s /home/shared/tpups.py /usr/local/bin/tpups
 chmod +x /home/shared/tpu-usage.py
 sudo ln -s /home/shared/tpu-usage.py /usr/local/bin/tpu-usage
+chmod +x /home/shared/tpu-heatmap.py
+sudo ln -s /home/shared/tpu-heatmap.py /usr/local/bin/tpu-heatmap
 ```
 
 Set up heartbeat, tpups, and server:
@@ -230,12 +238,46 @@ sudo chmod +777 /tmp/tpu_logs/
 System log size limits
 ----------------------
 
-???
+Check storage:
+
+```
+# quick check
+df -h
+# investigate
+sudo du -hd1 /
+sudo du -h /var/log/* | sort -h
+```
 
 ### Trouble: System logs blowing up?
 
 Last time I had some issues with system logs blowing up. Should be possible to
 limit their size.
+
+For syslog and kern.log, edit `/etc/rsyslog.d/50-default.conf` as follows:
+
+```
+# replace this line:
+*.*;auth,authpriv.none          -/var/log/syslog
+# with these two:
+$outchannel mysyslog,/var/log/syslog,1048576 # 1MB
+*.*;auth,authpriv.none          :omfile:$mysyslog
+
+# and replace this line:
+kern.*                          -/var/log/kern.log
+# with these two:
+$outchannel mykernlog,/var/log/kern.log,1048576 # 1MB
+kern.*                          :omfile:$mykernlog
+```
+
+Don't forget to restart the service:
+```
+sudo systemctl restart  rsyslog.service
+```
+
+Let's see if that works?
+
+Similar for journals:
+
 
 https://linuxhandbook.com/clear-systemd-journal-logs/
 
@@ -310,7 +352,21 @@ eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/mfr-tpus-gh
 ```
 
-Should work?
+Actually, seems like the above is for passworded keys, and for some reason this
+ssh agent is dying every time I log out (this didn't used to happen and doesn't
+happen on my laptop?). A simpler solution seems to be to add this to
+~/.ssh/config on each VM:
+
+```
+
+# GitHub keys
+Host github.com
+  User git
+  IdentityFile ~/.ssh/{name-of-your-key}
+  IdentitiesOnly yes
+```
+
+Remember to watch out for the SSH parser bug.
 
 TODO: Home set-up
 -----
@@ -340,5 +396,7 @@ Plan:
 
 * Provision maybe 14/16 nodes in this queue (save one or two for interactive
   use?)
-* Needs a persistent disk for script and data storage.
+* Needs a persistent disk for script and data storage? Or NFS again.
+* Can use /path/to/venv/bin/python as the command to automatically import the
+  venv.
 
