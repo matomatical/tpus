@@ -141,21 +141,6 @@ Fix some incompatible things
 sudo apt remove command-not-found
 ```
 
-Installing other system packages
---------------------------------
-
-Other packages I want installed globally:
-
-```
-sudo apt install zsh neovim
-```
-
-Other packages (currently only installed on TPU0):
-
-```
-sudo apt install ffmpeg
-```
-
 Installing custom scripts
 -------------------------
 
@@ -328,8 +313,28 @@ I think that's unlikely because I think the SSH version is up to date?
 
 Anyway it doesn't seem to be a wider problem so I'll just leave it...
 
-Configuring my GitHub
+Miscelaneous issues
+-------------------
+
+### Trouble: bash shows a setlocale warning
+
+The warning shows up thus:
+```
+/bin/bash: warning: setlocale: LC_ALL: cannot change locale (en_AU.UTF-8)
+```
+
+Fix it by installing the missing locale:
+
+```
+sudo locale-gen en_AU.UTF-8
+sudo update-locale LANG=en_AU.UTF_8
+```
+
+
+Making myself at home
 ---------------------
+
+### Configuring my GitHub
 
 On my local machine:
 
@@ -358,7 +363,6 @@ happen on my laptop?). A simpler solution seems to be to add this to
 ~/.ssh/config on each VM:
 
 ```
-
 # GitHub keys
 Host github.com
   User git
@@ -368,14 +372,42 @@ Host github.com
 
 Remember to watch out for the SSH parser bug.
 
-TODO: Home set-up
------
+### Installing neovim
 
-Make myself at home:
+On each vm:
 
-* Zsh instead of bash
-* Neovim instead of vim
-* Copy dotfiles
+```
+sudo apt install neovim
+mkdir -p ~/.config/nvim
+```
+
+Copy my config from local:
+```
+for t in 0 1 2 3; do scp -r home-stuff/init.vim tpu$t:.config/nvim/init.vim ; done
+```
+
+
+### Installing zsh
+
+On each VM:
+
+```
+sudo apt install zsh
+sudo chsh -s $(which zsh) $(whoami)
+```
+
+Copy my config from local:
+```
+for t in 0 1 2 3; do scp -r home-stuff/zshrc.zshrc tpu$t:.zshrc ; done
+```
+
+### Other packages:
+
+Other packages (currently only installed on TPU0):
+
+```
+sudo apt install ffmpeg
+```
 
 TODO: External persistent storage
 ---------------------------------
