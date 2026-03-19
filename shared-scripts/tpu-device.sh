@@ -39,8 +39,8 @@ case $NUM_DEVICES in
     *) echo "Error: Only 1, 2, or 4 devices supported (got $NUM_DEVICES)."; exit 1 ;;
 esac
 
-export TPU_CHIPS_PER_HOST_BOUNDS=$BOUNDS
-export TPU_HOST_BOUNDS=1,1,1
+export TPU_CHIPS_PER_PROCESS_BOUNDS=$BOUNDS
+export TPU_PROCESS_BOUNDS=1,1,1
 export TPU_VISIBLE_DEVICES=$DEVICE_IDS
 
 if [ "$NUM_DEVICES" -eq 2 ]; then
