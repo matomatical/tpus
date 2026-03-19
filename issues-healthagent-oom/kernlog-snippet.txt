@@ -1,0 +1,76 @@
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925177] Call Trace:
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925178]  <TASK>
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925180]  show_stack+0x4e/0x61
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925184]  dump_stack_lvl+0x4a/0x6f
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925187]  dump_stack+0x10/0x18
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925190]  dump_header+0x53/0x230
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925193]  out_of_memory.cold+0x1f/0x93
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925195]  mem_cgroup_out_of_memory+0x13d/0x160
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925199]  try_charge_memcg+0x62a/0x6f0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925202]  ? get_page_from_freelist+0x308/0x480
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925205]  ? charge_memcg+0x99/0x100
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925208]  charge_memcg+0x99/0x100
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925210]  __mem_cgroup_charge+0x31/0xa0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925213]  ? __alloc_pages+0x1e7/0x330
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925216]  __filemap_add_folio+0x218/0x570
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925219]  ? scan_shadow_nodes+0x40/0x40
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925222]  filemap_add_folio+0x3d/0xb0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925225]  __filemap_get_folio+0x16d/0x3b0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925228]  ? page_cache_ra_order+0x1be/0x300
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925231]  filemap_fault+0x144/0x900
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925234]  __do_fault+0x3c/0x120
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925237]  do_read_fault+0xf5/0x170
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925239]  do_fault+0xa6/0x300
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925241]  handle_pte_fault+0x117/0x240
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925243]  __handle_mm_fault+0x693/0x740
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925246]  handle_mm_fault+0xb0/0x290
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925248]  do_user_addr_fault+0x1ac/0x660
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925251]  exc_page_fault+0x80/0x190
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925253]  asm_exc_page_fault+0x27/0x30
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925255] RIP: 0033:0x55b74351efff
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925259] Code: Unable to access opcode bytes at RIP 0x55b74351efd5.
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925260] RSP: 002b:00007f39cfffeab8 EFLAGS: 00010206
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925262] RAX: 00007f39cfffebd8 RBX: 0000000000000000 RCX: 0000000000000000
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925263] RDX: 000055b744943170 RSI: 000000c001eee9d8 RDI: 0000000000000000
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925264] RBP: 00007f39cfffeb10 R08: 000055b7447c0060 R09: 000055b7447e11e8
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925266] R10: 00007f3c6c67b7e3 R11: 0000000000000010 R12: 0000000000000040
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925267] R13: 0000000000000000 R14: 000000c0153ba1c0 R15: 0000000000000001
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925270]  </TASK>
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925271] memory: usage 524288kB, limit 524288kB, failcnt 142151742
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925272] swap: usage 0kB, limit 524288kB, failcnt 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925274] Memory cgroup stats for /system.slice/docker-69522f1a69d3061926f9b1250c8bfe6a1ecd0a0cd4e3c2eb734b37dac0cea279.scope:
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] anon 528056320
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] file 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] kernel 7852032
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] kernel_stack 2965504
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] pagetables 2744320
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] percpu 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] sock 962560
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] vmalloc 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] shmem 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] zswap 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] zswapped 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] file_mapped 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] file_dirty 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] file_writeback 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] swapcached 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] anon_thp 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] file_thp 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] shmem_thp 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] inactive_anon 528052224
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] active_anon 4096
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] inactive_file 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] active_file 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] unevictable 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] slab_reclaimable 349256
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] slab_unreclaimable 1761944
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] slab 2111200
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] workingset_refault_anon 0
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925284] workingset_refault_file 23672110
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925289] Tasks state (memory values in pages):
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925289] [  pid  ]   uid  tgid total_vm      rss pgtables_bytes swapents oom_score_adj name
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925295] [3738523]     0 3738523  3758148   128911  2760704        0         -1000 healthAgent
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925297] Out of memory and no killable processes...
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925903] healthAgent invoked oom-killer: gfp_mask=0x100cca(GFP_HIGHUSER_MOVABLE), order=0, oom_score_adj=-1000
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925910] CPU: 144 PID: 841223 Comm: healthAgent Tainted: G           O      5.19.0-1022-gcp #24~22.04.1-Ubuntu
+Mar 19 17:21:44 t1v-n-ab15a7e0-w-2 kernel: [3054438.925913] Hardware name: Google Google Compute Engine/Google Compute Engine, BIOS Google 10/25/2025

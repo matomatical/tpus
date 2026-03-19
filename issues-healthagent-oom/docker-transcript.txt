@@ -1,0 +1,295 @@
+Welcome to Ubuntu 22.04.5 LTS (GNU/Linux 5.19.0-1022-gcp x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+ System information as of Thu 19 Mar 2026 17:29:51 UTC
+
+ * Strictly confined Kubernetes makes edge and IoT secure. Learn how MicroK8s
+   just raised the bar for easy, resilient and secure K8s cluster deployment.
+
+   https://ubuntu.com/engage/secure-kubernetes-at-the-edge
+
+Expanded Security Maintenance for Applications is not enabled.
+
+0 updates can be applied immediately.
+
+15 additional security updates can be applied with ESM Apps.
+Learn more about enabling ESM Apps service at https://ubuntu.com/esm
+
+
+The list of available updates is more than a week old.
+To check for new updates run: sudo apt update
+
+Last login: Thu Mar 19 16:49:39 2026 from 62.232.135.142
+matt@tpu2 :) ~ $ sudo docker ps --format '{{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Names}}' 2>&1
+05dc30d8fdb6	gcr.io/cloud-tpu-v2-images/monitoring_agent:cloud_tpu.monitoringagent.1vm_20240925_RC00	     Up 2 hours	     monitoringagent
+69522f1a69d3	gcr.io/cloud-tpu-v2-images/tpu_agents:cl_695344571	Up 2 weeks	healthagent
+cc6f5a315b6e	gcr.io/cloud-tpu-v2-images/instance_agent:stable	Up 5 weeks	instance_agent
+d32d9ef9408f	gcr.io/cloud-tpu-v2-images/collectd-agent:cl_225018473	Up 5 weeks	google-collectd
+0bb4c605bed7	gcr.io/cloud-tpu-v2-images/fake_tensorflow:latest	Up 5 weeks	tpu-runtime
+5a0d083f1dd9	gcr.io/cloud-tpu-v2-images/runtime_monitor:cl_534554121	Up 5 weeks	google-runtime-monitor
+matt@tpu2 :) ~ $ sudo docker ps --filter "id=69522f1a69d3"
+CONTAINER ID   IMAGE                                                COMMAND                  CREATED       STATUS       PORTS     NAMES
+69522f1a69d3   gcr.io/cloud-tpu-v2-images/tpu_agents:cl_695344571   "tpu_agents/bin/heal…"   2 weeks ago   Up 2 weeks             healthagent
+matt@tpu2 :) ~ $ sudo docker inspect 69522f1a69d3
+[
+    {
+        "Id": "69522f1a69d3061926f9b1250c8bfe6a1ecd0a0cd4e3c2eb734b37dac0cea279",
+        "Created": "2026-03-02T12:45:19.898758922Z",
+        "Path": "tpu_agents/bin/healthAgent",
+        "Args": [
+            "--check-runtime-server-health=true",
+            "--logtostderr",
+            "unhealthy-maintenance"
+        ],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 3738523,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2026-03-02T12:45:19.949349999Z",
+            "FinishedAt": "0001-01-01T00:00:00Z"
+        },
+        "Image": "sha256:f787a93bd86d0ada09fe6fd053b4612d87a30be219c09cfc2283c961c95a04a1",
+        "ResolvConfPath": "/var/lib/docker/containers/69522f1a69d3061926f9b1250c8bfe6a1ecd0a0cd4e3c2eb734b37dac0cea279/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/69522f1a69d3061926f9b1250c8bfe6a1ecd0a0cd4e3c2eb734b37dac0cea279/hostname",
+        "HostsPath": "/var/lib/docker/containers/69522f1a69d3061926f9b1250c8bfe6a1ecd0a0cd4e3c2eb734b37dac0cea279/hosts",
+        "LogPath": "/var/lib/docker/containers/69522f1a69d3061926f9b1250c8bfe6a1ecd0a0cd4e3c2eb734b37dac0cea279/69522f1a69d3061926f9b1250c8bfe6a1ecd0a0cd4e3c2eb734b37dac0cea279-json.log",
+        "Name": "/healthagent",
+        "RestartCount": 0,
+        "Driver": "overlay2",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "unconfined",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [
+                "/tmp:/tmp",
+                "/var/log/:/var/log/",
+                "/var/run/docker.sock:/var/run/docker.sock",
+                "/usr/bin/docker:/usr/bin/docker",
+                "/usr/lib64:/usr/lib64:ro",
+                "/lib64:/lib64:ro"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "host",
+            "PortBindings": {},
+            "RestartPolicy": {
+                "Name": "no",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": true,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": null,
+            "CapDrop": null,
+            "CgroupnsMode": "private",
+            "Dns": null,
+            "DnsOptions": [],
+            "DnsSearch": [],
+            "ExtraHosts": null,
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": -1000,
+            "PidMode": "host",
+            "Privileged": true,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": false,
+            "SecurityOpt": [
+                "label=disable"
+            ],
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 536870912,
+            "NanoCpus": 1000000000,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": [],
+            "BlkioDeviceReadBps": [],
+            "BlkioDeviceWriteBps": [],
+            "BlkioDeviceReadIOps": [],
+            "BlkioDeviceWriteIOps": [],
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": [],
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "MemoryReservation": 0,
+            "MemorySwap": 1073741824,
+            "MemorySwappiness": null,
+            "OomKillDisable": null,
+            "PidsLimit": null,
+            "Ulimits": [],
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "MaskedPaths": null,
+            "ReadonlyPaths": null
+        },
+        "GraphDriver": {
+            "Data": {
+                "ID": "69522f1a69d3061926f9b1250c8bfe6a1ecd0a0cd4e3c2eb734b37dac0cea279",
+                "LowerDir": "/var/lib/docker/overlay2/f0ef9c0002631f83497fa8f8f1fe4a66a330cfc2acd2fd83340aa771d0cdf7d4-init/diff:/var/lib/docker/overlay2/bb4bcd4d75880a1b53d7751f0e69d76216122045570153cdd96a1d8bcb8ee01d/diff:/var/lib/docker/overlay2/8ea600e529905af7c2022060d51a0ea6e46f216f05391208b8aa433d90641795/diff:/var/lib/docker/overlay2/56b6de7c0d5faaab070a5bf4769eedded63e64ab0d3a09235af240fb5c13e7e1/diff",
+                "MergedDir": "/var/lib/docker/overlay2/f0ef9c0002631f83497fa8f8f1fe4a66a330cfc2acd2fd83340aa771d0cdf7d4/merged",
+                "UpperDir": "/var/lib/docker/overlay2/f0ef9c0002631f83497fa8f8f1fe4a66a330cfc2acd2fd83340aa771d0cdf7d4/diff",
+                "WorkDir": "/var/lib/docker/overlay2/f0ef9c0002631f83497fa8f8f1fe4a66a330cfc2acd2fd83340aa771d0cdf7d4/work"
+            },
+            "Name": "overlay2"
+        },
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/tmp",
+                "Destination": "/tmp",
+                "Mode": "",
+                "RW": true,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/var/log",
+                "Destination": "/var/log",
+                "Mode": "",
+                "RW": true,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/var/run/docker.sock",
+                "Destination": "/var/run/docker.sock",
+                "Mode": "",
+                "RW": true,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/usr/bin/docker",
+                "Destination": "/usr/bin/docker",
+                "Mode": "",
+                "RW": true,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/usr/lib64",
+                "Destination": "/usr/lib64",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "bind",
+                "Source": "/lib64",
+                "Destination": "/lib64",
+                "Mode": "ro",
+                "RW": false,
+                "Propagation": "rprivate"
+            }
+        ],
+        "Config": {
+            "Hostname": "t1v-n-ab15a7e0-w-2",
+            "Domainname": "",
+            "User": "",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": null,
+            "Cmd": [
+                "tpu_agents/bin/healthAgent",
+                "--check-runtime-server-health=true",
+                "--logtostderr",
+                "unhealthy-maintenance"
+            ],
+            "Image": "gcr.io/cloud-tpu-v2-images/tpu_agents:cl_695344571",
+            "Volumes": null,
+            "WorkingDir": "",
+            "Entrypoint": null,
+            "Labels": {}
+        },
+        "NetworkSettings": {
+            "SandboxID": "ed10ef45800f80c53d818c5a483cd01778c89e28b1a817e850659a808332eaca",
+            "SandboxKey": "/var/run/docker/netns/default",
+            "Ports": {},
+            "Networks": {
+                "host": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": null,
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "ba736917f6ebe56919ef2554c879a812e986100de608f6fb18d23875e5279f69",
+                    "EndpointID": "4d7ce0d7c3b1ae7f161d0075557d8f1b0c5f8d41c46b646ed3e6ef5edc96ee28",
+                    "Gateway": "",
+                    "IPAddress": "",
+                    "MacAddress": "",
+                    "IPPrefixLen": 0,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": null
+                }
+            }
+        }
+    }
+]
+matt@tpu2 :) ~ $ sudo docker exec 69522f1a69d3 ls -la /
+^C
+matt@tpu2 :) ~ $ sudo docker exec 69522f1a69d3 cat /etc/os-release
+^C
+matt@tpu2 :) ~ $ # note: both hang for several seconds with no output^
+zsh: command not found: #
+matt@tpu2 :( 127 ~ $ systemctl list-units | grep -i health
+  healthagent.service                                                                                   loaded active     running   TPU Health Agent
+matt@tpu2 :) ~ $ systemctl cat healthagent.service
+# /etc/systemd/system/healthagent.service
+[Unit]
+Description=TPU Health Agent
+After=docker.service
+
+[Service]
+Environment="HOME=/home/tpu-runtime"
+EnvironmentFile=/home/tpu-runtime/tpu-env
+ExecStartPre=/bin/bash -c "/usr/bin/systemctl set-environment POLL_TF_RUNTIME=\"$(/usr/bin/python3 /var/scripts/get-vm-metadata.py disable-tpu-runtime "false" | ([ $(cat)>
+ExecStartPre=/usr/bin/docker-credential-gcr configure-docker
+ExecStartPre=-/usr/bin/docker rm -f -v healthagent
+ExecStartPre=/usr/bin/docker pull $HEALTH_AGENT_DOCKER_URL
+ExecStartPre=/bin/bash /var/scripts/container-restartCount.sh healthagent
+ExecStart=/usr/bin/docker run --memory=512m --cpus="1.0" --rm --name=healthagent --pid=host --net=host --privileged --oom-kill-disable=true --oom-score-adj=-1000 -v /usr/>
+ExecStop=/usr/bin/docker stop healthagent
+ExecStopPost=/usr/bin/docker rm -f -v healthagent
+Restart=on-failure
+RestartSec=5
+OOMScoreAdjust=-1000
+
+[Install]
+WantedBy=multi-user.target

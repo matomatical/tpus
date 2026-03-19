@@ -1,0 +1,151 @@
+# Bug Report: healthAgent memory leak causes OOM log flood on TPU VMs
+
+## Summary
+
+The `healthAgent` Docker container on TPU VMs has a memory leak that causes it
+to exhaust its 512MB cgroup limit. The container is configured with both
+`--oom-kill-disable=true` and `--oom-score-adj=-1000`, which prevents the OOM
+killer from resolving the situation. This creates an infinite OOM killer
+invocation loop that floods `kern.log` with multiple messages per second,
+eventually causing storage issues. The healthAgent itself becomes completely
+unresponsive (docker exec hangs indefinitely).
+
+## Environment
+
+- **TPU VM hostname**: t1v-n-ab15a7e0-w-2 (TPU v1 worker node)
+- **Kernel**: 5.19.0-1022-gcp #24~22.04.1-Ubuntu
+- **Hardware**: Google Compute Engine
+- **TPU VM image**: TODO — run `gcloud compute tpus tpu-vm describe <tpu-name> --zone <zone>` and note the image/version
+- **Container image**: `gcr.io/cloud-tpu-v2-images/tpu_agents:cl_695344571`
+- **Container ID**: 69522f1a69d3061926f9b1250c8bfe6a1ecd0a0cd4e3c2eb734b37dac0cea279
+- **Container created**: 2026-03-02T12:45:19Z
+- **Systemd unit**: `/etc/systemd/system/healthagent.service`
+
+## Other containers on the VM
+
+The healthAgent is one of 6 Google-provided containers in the TPU management stack:
+
+| Container | Image | Status |
+|-----------|-------|--------|
+| monitoringagent | `gcr.io/cloud-tpu-v2-images/monitoring_agent:cloud_tpu.monitoringagent.1vm_20240925_RC00` | Up 2 hours |
+| **healthagent** | **`gcr.io/cloud-tpu-v2-images/tpu_agents:cl_695344571`** | **Up 2 weeks** |
+| instance_agent | `gcr.io/cloud-tpu-v2-images/instance_agent:stable` | Up 5 weeks |
+| google-collectd | `gcr.io/cloud-tpu-v2-images/collectd-agent:cl_225018473` | Up 5 weeks |
+| tpu-runtime | `gcr.io/cloud-tpu-v2-images/fake_tensorflow:latest` | Up 5 weeks |
+| google-runtime-monitor | `gcr.io/cloud-tpu-v2-images/runtime_monitor:cl_534554121` | Up 5 weeks |
+
+## Symptoms
+
+1. `kern.log` grows rapidly (multiple OOM messages per second)
+2. Storage fills up over time due to log volume
+3. The healthAgent process is completely unresponsive (`docker exec` hangs indefinitely)
+4. The container cannot be interacted with normally
+
+## Root cause analysis
+
+The healthAgent (a Go binary running inside a Docker container) gradually leaks
+memory over some period of time (container was ~17 days old when observed) until it hits the 512MB cgroup memory limit. At that point:
+
+1. Any memory allocation triggers the kernel OOM killer
+2. The OOM killer cannot kill the process due to `--oom-kill-disable=true` and
+   `--oom-score-adj=-1000`
+3. The allocation fails, healthAgent retries immediately, triggering another OOM
+   invocation
+4. This repeats indefinitely, flooding the kernel log
+
+### The configuration that makes this catastrophic
+
+The systemd unit (`healthagent.service`) launches the container with:
+
+```
+/usr/bin/docker run --memory=512m --cpus="1.0" --rm --name=healthagent \
+  --pid=host --net=host --privileged \
+  --oom-kill-disable=true --oom-score-adj=-1000 \
+  ...
+```
+
+This is a problematic combination:
+- `--memory=512m` — hard memory ceiling
+- `--oom-kill-disable=true` — prevents kernel from killing the process on OOM
+- `--oom-score-adj=-1000` — additional OOM kill immunity
+
+Ironically, the systemd unit also has `Restart=on-failure` with `RestartSec=5`,
+which would recover from this situation automatically — but the OOM kill
+protection prevents the container from ever dying, so the restart logic never
+triggers.
+
+### Evidence from kernel log
+
+- **Memory usage at limit**: `usage 524288kB, limit 524288kB` (512MB fully exhausted)
+- **Failure count**: `failcnt 142151742` (142 million OOM attempts)
+- **Process details**: PID 3738523, RSS 128911 pages (~503MB), `oom_score_adj=-1000`
+- **Memory profile**:
+  - `anon`: 503MB (Go heap), nearly all `inactive_anon` (allocated but not recently accessed — indicates leaked/abandoned allocations)
+  - `kernel_stack`: 2.8MB (suggests large number of goroutines, possibly leaked)
+  - `sock`: 940KB (network connections)
+  - `file`: 0 (no file cache — all memory consumed by heap)
+- **VM uptime at time of log**: some period of time (container was ~17 days old when observed) (kernel timestamp 3054438 seconds)
+- **Container age at time of log**: ~17 days (created 2026-03-02, log from 2026-03-19)
+- **Time to OOM**: unknown — the OOM loop was already in progress when noticed
+- **Go runtime indicators**: Register values show Go heap pointers (RSI: `0xc001eee9d8`, R14: `0xc0153ba1c0` — characteristic `0xc0` prefix of Go's memory allocator)
+
+### Two compounding issues
+
+1. **Memory leak in healthAgent** — the primary bug. The process accumulates
+   ~503MB of mostly-inactive heap over some period of time (container was ~17 days old when observed).
+2. **OOM-kill immunity + hard memory limit** — the configuration bug. Setting
+   `--oom-kill-disable=true` and `--oom-score-adj=-1000` inside a
+   memory-limited cgroup means the OOM killer can never resolve the situation,
+   turning a simple OOM into an infinite log-flooding loop. Removing these flags
+   would let the container die and systemd's `Restart=on-failure` would
+   automatically recover it.
+
+## Impact
+
+- Kernel log fills disk, potentially causing broader system issues
+- healthAgent becomes non-functional (cannot allocate memory, hangs on exec)
+- Constant OOM killer invocations waste CPU cycles
+- TPU health monitoring is effectively disabled after some period of time (container was ~17 days old when observed)
+
+## Suggested fixes
+
+1. **Fix the memory leak** in healthAgent (likely growing maps, slices, or
+   leaked goroutines in the Go code)
+2. **Remove `--oom-kill-disable=true` and `--oom-score-adj=-1000`** from the
+   container launch flags. This lets the OOM killer terminate the container,
+   and the existing `Restart=on-failure` systemd policy will restart it
+   automatically — turning a permanent hang into a brief ~5 second restart
+3. As a stopgap, increase the container memory limit above 512MB (delays but
+   does not prevent the eventual OOM)
+
+## Frequency
+
+This issue has been observed repeatedly across multiple TPU VMs over a period of
+several months, with `kern.log` growing to very large sizes. On some occasions,
+`syslog` has also blown up, though it is unclear whether that was the same root
+cause or a separate issue. The `kern.log` issue is likely recurring on a
+predictable cycle — any time the healthAgent container runs long enough without
+being restarted, it eventually exhausts its 512MB limit. Events that reset the
+clock (VM reboots, container restarts, log cleanup) mask the regularity of the
+issue.
+
+## Workaround
+
+Users can restart the healthAgent to temporarily resolve the issue:
+
+```bash
+sudo systemctl restart healthagent.service
+```
+
+This will recur after some period of time (container was ~17 days old when observed) as the memory leak continues.
+
+## Reproduction
+
+- Provision a TPU VM with the default image (TODO: note exact image version)
+- Leave the healthAgent container running for some period of time (container was ~17 days old when observed)
+- Observe kern.log filling with OOM messages
+
+## Attachments
+
+- TODO: attach full kern.log snippet
+- TODO: attach output of `sudo docker inspect 69522f1a69d3`

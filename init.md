@@ -233,44 +233,54 @@ sudo du -hd1 /
 sudo du -h /var/log/* | sort -h
 ```
 
-### Trouble: Stop system logs blowing up
+### Configuring logrotate
 
-Last time I had some issues with system logs blowing up. Specifically
-`kern.log` and `syslog` both, sometimes for different reasons, would stop every
-now and then but come back.
-
-Should be possible to limit their size.
-
-For syslog and kern.log, edit `/etc/rsyslog.d/50-default.conf` as follows:
+The default logrotate config for rsyslog only rotates weekly, which is not
+enough---`kern.log` and `syslog` can blow up due to noisy kernel messages (e.g.
+from the TPU gasket driver or the healthAgent Docker container hitting its OOM
+limit). Install a custom logrotate config that rotates these daily and also at
+100MB:
 
 ```
-# replace this line:
-*.*;auth,authpriv.none          -/var/log/syslog
-# with these two:
-$outchannel mysyslog,/var/log/syslog,1048576 # 1MB
-*.*;auth,authpriv.none          :omfile:$mysyslog
-
-# and replace this line:
-kern.*                          -/var/log/kern.log
-# with these two:
-$outchannel mykernlog,/var/log/kern.log,1048576 # 1MB
-kern.*                          :omfile:$mykernlog
+for t in 0 1 2 3; do scp conf/logrotate-rsyslog.conf tpu$t:/tmp/; done
+for t in 0 1 2 3; do ssh tpu$t 'sudo cp /tmp/logrotate-rsyslog.conf /etc/logrotate.d/rsyslog'; done
 ```
 
-Don't forget to restart the service:
+### Configuring journalctl
+
+Alongside rsyslog, the system logs most messages also to journalctl's binary
+database, which lives at `/var/log/journal/`. The same kinds of issues cause it
+to blow up to 4GB which is the default max size. This seems unnecessary, can
+lower the size limit to 500MB and then restart the service as follows.
+
 ```
-sudo systemctl restart  rsyslog.service
+for t in 0 1 2 3; do
+    ssh tpu$t 'sudo mkdir -p /etc/systemd/journald.conf.d && echo -e "[Journal]\nSystemMaxUse=500M" | sudo tee /etc/systemd/journald.conf.d/size.conf && sudo systemctl restart systemd-journald'
+done
 ```
 
-Let's see if that works?
+### Trouble: Truncating bloated logs
 
-Similar for journals:
+If the logs have already grown too large, truncate them:
 
-https://linuxhandbook.com/clear-systemd-journal-logs/
+```
+for t in 0 1 2 3; do ssh tpu$t 'sudo truncate -s 0 /var/log/kern.log /var/log/syslog'; done
+```
 
-### Trouble: System logs blowing up, actual cause 1
+### Trouble: healthAgent OOM
 
-Claude helped me discover that one of the 
+The Google-provided `healthAgent` Docker container (part of the default TPU VM
+image) appears to have a memory leak. It gradually fills its 512MB cgroup limit
+and then floods `kern.log` with OOM messages because it is configured with
+`--oom-kill-disable=true`. Restart it with:
+
+```
+sudo systemctl restart healthagent.service
+```
+
+Maybe do this every few days to stop the memory leak resurfacing.
+
+See `issues-healthagent-oom/` for a detailed bug report.
 
 Configuring intra-cluster keys
 ----------------------------
