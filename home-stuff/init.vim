@@ -54,7 +54,6 @@ function! ToggleTOC()
     else
         normal! zM
     endif
-    call SmartZZ()
 endfunction
 nnoremap z<Return> :call ToggleTOC()<CR>
 

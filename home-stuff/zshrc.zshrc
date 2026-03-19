@@ -58,3 +58,9 @@ auto_activate
 # run the function every time we change directories thereafter
 add-zsh-hook chpwd auto_activate
 
+# colours
+export COLORTERM=truecolor
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias egrep='egrep --color=auto'

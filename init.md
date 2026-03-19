@@ -233,10 +233,13 @@ sudo du -hd1 /
 sudo du -h /var/log/* | sort -h
 ```
 
-### Trouble: System logs blowing up?
+### Trouble: Stop system logs blowing up
 
-Last time I had some issues with system logs blowing up. Should be possible to
-limit their size.
+Last time I had some issues with system logs blowing up. Specifically
+`kern.log` and `syslog` both, sometimes for different reasons, would stop every
+now and then but come back.
+
+Should be possible to limit their size.
 
 For syslog and kern.log, edit `/etc/rsyslog.d/50-default.conf` as follows:
 
@@ -263,8 +266,11 @@ Let's see if that works?
 
 Similar for journals:
 
-
 https://linuxhandbook.com/clear-systemd-journal-logs/
+
+### Trouble: System logs blowing up, actual cause 1
+
+Claude helped me discover that one of the 
 
 Configuring intra-cluster keys
 ----------------------------
@@ -406,7 +412,7 @@ for t in 0 1 2 3; do scp -r home-stuff/zshrc.zshrc tpu$t:.zshrc ; done
 Other packages (currently only installed on TPU0):
 
 ```
-sudo apt install ffmpeg
+sudo apt install ffmpeg pandoc entr tectonic
 ```
 
 TODO: External persistent storage
