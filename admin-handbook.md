@@ -21,6 +21,31 @@ Sometimes this fails if there are no free resources. In that case tick the
 option to create a queued resource instead, which means it will be created as
 soon as one becomes available.
 
+### Verifying cluster hardware
+
+After provisioning, verify the key stats from each VM:
+
+```
+# CPU model and core count
+cat /proc/cpuinfo | grep "model name" | head -1
+nproc
+
+# Memory
+free -h
+
+# Disk
+df -h /
+
+# TPU devices (should show accel0-3 on each VM)
+ls /dev/accel*
+
+# OS version
+lsb_release -d
+
+# TPU devices visible to JAX (shows 1 of 4 per-VM devices)
+tpu-device 0 python3 -c "import jax; print(jax.devices())"
+```
+
 ### Trouble: TPU version
 
 Previously I tried `--version=tpu-vm-base`, but that turned out to be a mistake
