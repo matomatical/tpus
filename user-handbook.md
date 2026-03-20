@@ -145,38 +145,70 @@ Note: These IP addresses might need to be updated from time to time. If
 the login command suddenly stops working, let me know and I will double
 check this.
 
-Working with code
+Working with files
+------------------
+
+There are several ways to transfer files to/from and edit files on the cluster.
+
+1. **Copy files:** The most basic way to modify files on the server is to
+   modify them locally and then copy files to the server. This is not an
+   efficient workflow for editing code but it is sometimes very useful so I
+   will explain how to do it. To copy files between your local machine and a VM
+   you can use `scp` (secure copy), which transfers files over SSH. For
+   example, to copy a file to `tpu0`:
+   ```console
+   scp myfile.py tpu0:~/myproject/
+   ```
+   Or to copy a file back from the cluster to your local machine:
+   ```console
+   scp tpu0:~/myproject/results.csv .
+   ```
+
+2. **Git + GitHub:** An easier way to copy a lot of files and keep them synced
+   between your local environment and the VMs is to use `git` and GitHub. You
+   can edit locally or on the VM, commit, push, and then pull where you want
+   the code. More details on setting up GitHub authentication in the next
+   section.
+
+3. **Terminal-based editors:** You can edit code directly on the cluster using
+   a terminal-based editor. This can also be slow if you are not used to it but
+   sometimes it is very useful so you should know how to do this too.
+
+   The most beginner-friendly option is to use the program `nano`. It works
+   just like a basic text editor but in the terminal. To start, use a command
+   like `nano myfile.py`. To save the file, use command + O (`^O`). To exit,
+   press command + X (`^X`). Other keybindings are displayed at the bottom of
+   the screen.
+
+   There is also `vim` and neovim `nvim` installed if you like, in which case
+   you know what you are doing.
+
+4. **Local VS Code + Remote SSH extension:** If you prefer a graphical editor,
+   VS Code can connect directly to the cluster using the **Remote - SSH**
+   extension. Once installed, it will use your `~/.ssh/config` to let you open
+   files, edit, and run terminals on the VMs as if they were local.
+
+   See the
+    [VS Code Remote-SSH documentation](https://code.visualstudio.com/docs/remote/ssh)
+   for setup instructions.
+
+**Remember:** The cluster should not be treated as permanent storage for code
+(see Data safety section above). If you develop code on the VMs, you should use
+git and push to GitHub regularly. If you generate important files on the VM,
+you should copy them to your local device or store them in git if they are not
+too large.
+
+Setting up GitHub
 -----------------
 
-You can edit code directly on the cluster using a terminal-based editor.
-`nano` is pre-installed and beginner-friendly—it shows its keybindings
-at the bottom of the screen. Just run `nano myfile.py`.
-
-If you prefer a graphical editor, VS Code can connect directly to the
-cluster using the **Remote - SSH** extension. Once installed, it will
-use your `~/.ssh/config` to let you open files, edit, and run terminals
-on the VMs as if they were local. See the
-[VS Code Remote-SSH documentation](https://code.visualstudio.com/docs/remote/ssh)
-for setup instructions.
-
-You can also copy files between your local machine and the cluster
-using `scp` (secure copy), which transfers files over SSH. For example,
-to copy a file to `tpu0`:
-
-```
-scp myfile.py tpu0:~/myproject/
-```
-
-Or to copy a file back from the cluster to your local machine:
-
-```
-scp tpu0:~/myproject/results.csv .
-```
-
-### Setting up GitHub
-
-**Important:** The cluster should not be treated as permanent storage
-(see Data safety above). You should push your code to GitHub regularly.
+To authorise your account on the cluster you will have to configure each
+VM with some SSH keys which you also add to GitHub. You can follow the
+instructions
+  [here](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent)
+and then
+  [here](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account)
+on each VM. If you are happy to use keys without a passphrase, you can follow
+the simpler steps below.
 
 1. Generate an SSH key on one of the VMs:
 
@@ -208,7 +240,7 @@ scp tpu0:~/myproject/results.csv .
    Repeat for `tpu2` and `tpu3` as needed.
 
 Setting up a virtual environment
----------------------------------
+--------------------------------
 
 You will need a Python virtual environment to install JAX and other
 packages. Each VM has its own disk, so you'll need to create a venv on
