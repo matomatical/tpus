@@ -10,7 +10,7 @@ Allocated via the TPU Research Cloud (TRC) programme.
 - `conf/` — config files to deploy to VMs (logrotate, etc.)
 - `admin-scripts/` — scripts for Matt's use (adduser, etc.)
 - `shared-scripts/` — scripts deployed to `/home/shared/` on each VM
-- `issues/` — bug reports for TPU VM image issues to send to Google
+- `issues/` — bug reports for TPU VM image issues or other notes
 - `users.md` — cluster user info
 - `home-stuff/` — dotfiles to deploy to VMs
 
@@ -35,3 +35,9 @@ March 19, 2026:
 - Investigated and reported a healthAgent OOM bug to Google (see
   `issues/healthagent-oom/`)
 - Created a streamlined user handbook for onboarding students to the cluster.
+
+March 26, 2026:
+
+- Added PyTorch/XLA support: tested installation and TPU access, added
+  `PJRT_DEVICE=TPU` to `tpu-device` wrapper, updated user handbook with
+  setup instructions and hello world examples for both JAX and PyTorch/XLA.

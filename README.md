@@ -30,6 +30,7 @@ TODO
 ----
 
 * [ ] Set up intra-cluster SSH for all users (see `issues/inter-vm-ssh/plan.md`)
+* [x] Instructions for making TPU VMs work with pytorch
 * [ ] Make tpu-device optional by default: Configure user profiles to export
   environment variables that bound TPUs to the current VM, and maybe to a
   single device, so that the default behaviour without tpu-device prefix is not

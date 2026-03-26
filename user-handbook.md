@@ -53,10 +53,8 @@ each node—files you create on one VM will not appear on the others. If
 you want to create shared files visible to other users on the same VM,
 you can put them in `/home/shared`.
 
-The cluster is set up for JAX, which is the preferred framework. PyTorch
-is not currently installed for TPU use, but I am open to setting it up
-in the future if there is demand—talk to me. You can install PyTorch in
-a venv and run it on the CPU if needed.
+The cluster supports both JAX and PyTorch/XLA for TPU workloads. See the setup
+sections below for each framework.
 
 Privacy and security
 --------------------
@@ -242,9 +240,21 @@ the simpler steps below.
 Setting up a virtual environment
 --------------------------------
 
-You will need a Python virtual environment to install JAX and other
-packages. Each VM has its own disk, so you'll need to create a venv on
-each VM you want to use:
+You will need a Python virtual environment to install your framework
+and other packages. Each VM has its own disk, so you'll need to create
+a venv on each VM you want to use.
+
+Remember to activate your venv (`source venv/bin/activate`) each time
+you log in before running your code.
+
+### JAX
+
+Working with JAX on the cluster is just like working with JAX on a GPU or CPU.
+You just need to install the correct version of JAX, namely `jax[tpu]` (rather
+than `jax` or `jax[cuda12]`).
+
+For example, these steps will create a Python virtual environment with JAX
+installed.
 
 ```
 uv venv venv
@@ -252,9 +262,34 @@ source venv/bin/activate
 uv pip install "jax[tpu]"
 ```
 
-Remember to activate your venv (`source venv/bin/activate`) each time
-you log in before running your code.
+For more detailed installation instructions, see the [JAX
+documentation](https://docs.jax.dev/en/latest/installation.html).
 
+### PyTorch/XLA
+
+PyTorch doesn't natively support TPU accelerators. To run PyTorch models on the
+TPUs, we need to install the [PyTorch/XLA](https://github.com/pytorch/xla)
+library.
+
+Last I checked, the library requires Python 3.8--3.11. The TPU VMs have Python
+3.11 installed, so we can ask `uv` to use that version when creating the
+virtual environment. PyTorch/XLA also works with a specific version of PyTorch,
+so we need to request that version when we install it. For example:
+
+```
+uv venv venv --python 3.11
+source venv/bin/activate
+uv pip install torch==2.8.0 'torch_xla[tpu]==2.8.0'
+```
+
+For more detailed installation instructions and alternative options, see 
+the [PyTorch/XLA repo](https://github.com/pytorch/xla).
+
+**Note:** After installing PyTorch/XLA, you will also need to modify your
+PyTorch training script to use it. See the official
+  [getting started guide](https://github.com/pytorch/xla?tab=readme-ov-file#getting-started)
+or [this tutorial of mine](https://far.in.net/tpu-go-brrr)
+(the latter may be a bit out of date).
 
 Using the TPUs
 ==============
@@ -317,22 +352,44 @@ experiments. Let's keep the TPUs warm!
 Hello, world!
 -------------
 
-Create a Python script called `hello.py` that initialises JAX and
-discovers the TPU devices:
+Create a Python script called `hello.py` to verify your setup. Here are
+examples for each framework.
 
+JAX:
 ```python
 # hello.py
 import jax
 
-devices = jax.devices()
-print("available devices:")
-for device in devices:
-    print("*", device)
-input("press enter to free up devices...")
+print("platform:", jax.default_backend())
+print("devices:", jax.devices())
+
+x = jax.numpy.ones(3) + jax.numpy.ones(3)
+print("computation: 1 + 1 =", x[0])
+
+input("press enter to release devices...")
 ```
 
-Let's say you want to run this on a single device `DEVICE` which could
-be `0`, `1`, `2`, or `3` on the current VM. Then run the script with:
+PyTorch/XLA:
+```python
+# hello.py
+import torch
+import torch_xla
+import torch_xla.runtime as xr
+
+print("platform:", xr.device_type())
+print("devices:", torch_xla.core.xla_model.get_xla_supported_devices())
+
+x = torch.ones(3, device=torch_xla.device()) + torch.ones(3, device=torch_xla.device())
+print("computation: 1 + 1 =", x[0].item())
+
+input("press enter to release devices...")
+```
+
+Remember to initialise your virtual environment following the instructions
+above and make sure the venv is active.
+
+Then, run the script on a single device `DEVICE` (which could be `0`, `1`, `2`,
+or `3` on the current VM):
 
 ```
 tpu-device DEVICE python hello.py
@@ -390,7 +447,8 @@ storage. Please be considerate with your usage. For example:
   inefficient.
 
 * Disk space is limited. Please try not to store large artefacts or
-  logs.
+  logs. PyTorch/XLA virtual environments are particularly large, let's try not
+  to install too many of those.
 
 To see what is currently happening on the TPUs, use standard tools like
 `htop` and see the `tpups` section above for TPU-specific monitoring.
@@ -427,12 +485,12 @@ The wrapped command `tpu-device <DEVICE> <command>` is essentially equivalent
 to:
 
 ```
-TPU_CHIPS_PER_PROCESS_BOUNDS=1,1,1 TPU_PROCESS_BOUNDS=1,1,1 TPU_VISIBLE_DEVICES=<DEVICE> <command>
+TPU_CHIPS_PER_PROCESS_BOUNDS=1,1,1 TPU_PROCESS_BOUNDS=1,1,1 TPU_VISIBLE_DEVICES=<DEVICE> PJRT_DEVICE=TPU <command>
 ```
 
 Putting `X=Y` before a command like this has the effect of setting environment
 variable `X` to the value `Y` during the execution of this command. When JAX
-launches it checks the above environment variables and uses them to see which
+or PyTorch/XLA launches it checks the above environment variables to see which
 parts of the cluster it should target. By default, the environment variables
 are such that JAX will try to connect all 16 devices across all 4 VMs, which is
 why it stalls.
@@ -444,7 +502,7 @@ information, a couple of alternatives are the following.
   once per shell session.
 * Add these `export` commands to your bash/zsh profile.
 * Set the environment variables from within Python before you import
-  JAX, using `os.environ`.
+  JAX or PyTorch/XLA, using `os.environ`.
 
 Using multiple devices on one TPU VM
 ------------------------------------
