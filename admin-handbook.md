@@ -447,8 +447,19 @@ for t in 0 1 2 3; do scp -r home-stuff/zshrc.zshrc tpu$t:.zshrc ; done
 Other packages (currently only installed on TPU0):
 
 ```
-sudo apt install ffmpeg pandoc entr tectonic
+sudo apt install ffmpeg
+sudo apt install pandoc
+sudo apt install entr
+sudo apt install texlive-latex-extra
 ```
+
+LaTeX has various distributions with various sizes, I went for something short
+of the full set
+  (see [here](https://tex.stackexchange.com/questions/245982/differences-between-texlive-packages-in-linux#answer-504566)
+  for notes on different options).
+Ideally could use tectonic but that does not have an official distribution via
+apt, only snap, and I seem to dislike snap? Could install manually or compile
+it from source if I installed rust.
 
 TODO: External persistent storage
 ---------------------------------
