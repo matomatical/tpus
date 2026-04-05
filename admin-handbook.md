@@ -142,41 +142,29 @@ sudo shutdown -r now
 However, I later realised I didn't want to `do-release-upgrade` and I should
 just recreate the cluster instead...
 
-Installing Python 3.14
-----------------------
+Installing uv
+-------------
 
-Installing a newer version of python
-([guide](https://tecadmin.net/how-to-install-python-3-14-on-ubuntu/)).
-
-```
-sudo apt install software-properties-common
-sudo add-apt-repository ppa:deadsnakes/ppa
-sudo apt update
-sudo apt install python3.14
-```
-
-Make 3.14 the default.
+Install uv as a standalone binary
+([docs](https://docs.astral.sh/uv/getting-started/installation/)):
 
 ```
-sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.14 314
-sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.10 310
-sudo update-alternatives --config python3 # only one alternative, not needed!
+curl -LsSf https://astral.sh/uv/install.sh | sudo sh
 ```
 
-Install pip and uv (globally):
+
+### Trouble: Using newer versions of Python
+
+Previously, I was installing python3.14 at system level. That breaks some
+things, easier to let uv manage all Python versions. To use a newer Python in a
+project, just specify it when creating a venv:
 
 ```
-sudo apt install python3.14-venv
-sudo python3.14 -m ensurepip --upgrade --default-pip
-sudo python3.14 -m pip install --upgrade pip
-sudo pip install uv
+uv venv --python 3.14
 ```
 
-Fix some incompatible things
-
-```
-sudo apt remove command-not-found
-```
+Then uv manages Python versions and virtual environments without modifying the
+system Python.
 
 Installing custom scripts
 -------------------------

@@ -44,9 +44,9 @@ Software
 The cluster runs Ubuntu 22.04. I can install arbitrary software, let me
 know if you need something that isn't there.
 
-The system Python is 3.14. Note that if you create virtual environments
-with `uv`, it may default to a different Python version (e.g. 3.12). You
-can force a specific version with `uv venv --python 3.14`.
+The system Python is 3.10. The `uv` tool is available for managing
+virtual environments and can install other Python versions as needed
+(e.g. `uv venv --python 3.14`).
 
 Each VM has its own independent disk. Your home directory is separate on
 each node—files you create on one VM will not appear on the others. If

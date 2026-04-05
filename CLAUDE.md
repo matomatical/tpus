@@ -41,3 +41,8 @@ March 26, 2026:
 - Added PyTorch/XLA support: tested installation and TPU access, added
   `PJRT_DEVICE=TPU` to `tpu-device` wrapper, updated user handbook with
   setup instructions and hello world examples for both JAX and PyTorch/XLA.
+
+April 5, 2026:
+
+- Reverted system Python from 3.14 back to 3.10 and switched to standalone uv
+  for Python version management.
