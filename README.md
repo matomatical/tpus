@@ -26,31 +26,67 @@ Repo contents
 * `issues/` — bug reports for TPU VM image issues
 * `users.md` — cluster user info
 
-Roadmap
+History
 -------
 
-Backend stability improvements:
+Most features built with help from Gemini and/or Claude.
 
-* [x] Heartbeat + HTTP server process supervision.
-* [x] Disk space supervision [minimal via MOTD and poll tpu-health]
-* [x] Investigate the SSH config byte bug... [can't reproduce]
-* [x] Periodically backup history.csv
-* [x] Healthagent OOM recurrence management
-* [x] Configure internal cluster ips via /etc/hosts rather than ssh config,
-  update scripts to use hostnames rather than ips
-* [x] Fix security issues running shared scripts.
-* [x] Streamline command blocks in admin handbook.
+Late 2025:
 
-More ambitious:
+* [x] Basic setup of important software.
+* [x] Automate user creation given a public key.
+* [x] tpu-heartbeat service for logging usage status and statistics.
+* [x] tpups utility for checking cluster usage status.
+* [x] tpu-usage utility for viewing usage statistics.
+* [x] tpu-device wrapper for managing environment variables.
+* [x] Original NFS based system (disk filled up, cluster died, RIP).
 
+March 2026, feature upgrades:
+
+* [x] tpu-device: support for multi-tpu job launching.
+* [x] tpu-heatmap utility visualising usage calendar. Let's keep the TPUs warm!
+* [x] Streamlined markdown user handbook for onboarding students to the
+  cluster.
+* [x] PyTorch/XLA support (instructions in handbook).
+
+March 2026, critical storage issue fixes:
+
+* [x] Configured logrotate and journald to cap log file size
+* [x] Investigated and reported a healthAgent OOM bug to Google (see
+  `issues/healthagent-oom/`).
+
+April 2026, feature upgrades:
+
+* [x] tpu-device: optional, default env vars equivalent to `tpu-device 0`.
+* [x] Inter-VM SSH configured by default for all users.
+* [x] `tpups` in MOTD.
+
+April 2026, backend stability improvements:
+
+* [x] Reverted system Python from 3.14 back to 3.10.
+* [x] Persistent fix for TPU log directory permission issue.
+* [x] tpu-heartbeat: promote to systemd service.
+* [x] healthAgent bug: Automatic weekly restarts.
+* [x] Hardened installation method for shared scripts.
+* [x] `tpu-health` utility for monitoring disk usage, heartbeat freshness,
+  service status, and healthAgent memory.
+* [x] `fetch-logs.sh` admin script for backing up heartbeat history.
+* [x] Streamlined admin handbook.
+
+Future
+------
+
+Ambitious new features:
+
+* [ ] Persistent and shared storage. Decide on something and run with it.
 * [ ] TPU queueing system: install or develop some simple system that makes it
   easier to launch large numbers of TPU job scripts for each user, and then
-  they will automatically be launched then TPUs are free.
-* [ ] Persistent and shared storage.
-* [ ] More AI agents on the cluster
+  they will automatically be launched when TPUs are free.
+* [ ] More AI agents on the cluster; in Slack channel, etc.
 
-Much more ambitious:
+Much more ambitious new features:
 
+* [ ] AI agents on the cluster can communicate and run their own research.
 * [ ] Command to run code on another TPU VM; all jobs can be managed from one
   VM.
 * [ ] A single reprovisioning script to set up the entire TPU cluster

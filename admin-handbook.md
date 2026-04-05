@@ -457,6 +457,8 @@ Host github.com
 
 ### Installing neovim
 
+Install neovim and load config:
+
 ```
 for t in 0 1 2 3; do
   ssh tpu$t 'sudo apt install -y neovim && mkdir -p ~/.config/nvim'
@@ -465,6 +467,8 @@ done
 ```
 
 ### Installing zsh
+
+Install zsh and load config:
 
 ```
 for t in 0 1 2 3; do
@@ -475,19 +479,52 @@ done
 
 ### Other packages
 
+Other system packages:
+
 ```
 for t in 0 1 2 3; do
-  ssh tpu$t 'sudo apt install -y ffmpeg pandoc entr texlive-latex-extra latexmk'
+  ssh tpu$t 'sudo apt install -y ffmpeg pandoc entr'
 done
 ```
+
+### Installing LaTeX
 
 LaTeX has various distributions with various sizes, I went for something short
 of the full set
   (see [here](https://tex.stackexchange.com/questions/245982/differences-between-texlive-packages-in-linux#answer-504566)
   for notes on different options).
+
+```
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo apt install -y texlive-latex-extra latexmk'
+done
+```
+
 Ideally could use tectonic but that does not have an official distribution via
 apt, only snap, and I seem to dislike snap? Could install manually or compile
-it from source if I installed rust.
+it from source if I installed rust. Ah---it is also on brew.
+
+### Installing NodeJS / apps
+
+Node available from apt is ridiculously old. I went with nvm. This means it's a
+local install and I only did it on tpu0 so far.
+
+```
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+```
+
+Note: it adds stuff to zshrc to get onto path.
+
+Installing apps can then use -g because that is still only me:
+
+```
+
+```
+
+If I needed to install node system packages globally? Hope I never face that
+issue, but probably nvm can be configured to handle it. Ideally it is just like
+uv and people can take care of their own environments.
+
 
 TODO: External persistent storage
 ---------------------------------
