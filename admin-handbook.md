@@ -225,24 +225,15 @@ sudo ./adduser.sh afiq AAAAC3NzaC1lZDI1NTE5AAAAINmp4YYoMgXP8MEQsMjkla+o81pwI7hj9
 TPU logging permission
 ----------------------
 
-The first time a user runs something on the TPUs, for some reason it claims the
-tpu logs and subsequent users get lots of warnings.
-
-Use the TPUs to create log folder:
-
-```
-uv venv venv
-source venv/bin/activate
-uv pip install "jax[tpu]"
-tpu-device 0 python -c "import jax; print(jax.devices())"
-rm -rf venv
-```
-
-Reset log folder ownership:
+The TPU runtime writes logs to `/tmp/tpu_logs/`. Whichever user first triggers
+this directory's creation ends up owning it, and other users get "Permission
+denied" warnings. To fix this, install a `tmpfiles.d` config that ensures the
+directory is created with mode 1777 (world-writable + sticky bit, like `/tmp`
+itself) on every boot:
 
 ```
-sudo chown -R tpu-runtime:tpu-runtime /tmp/tpu_logs/
-sudo chmod +777 /tmp/tpu_logs/
+for t in 0 1 2 3; do scp conf/tpu-logs.conf tpu$t:/tmp/; done
+for t in 0 1 2 3; do ssh tpu$t 'sudo cp /tmp/tpu-logs.conf /etc/tmpfiles.d/tpu-logs.conf && sudo systemd-tmpfiles --create'; done
 ```
 
 System log size limits

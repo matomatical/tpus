@@ -49,3 +49,5 @@ April 5, 2026:
 - Made tpu-device optional by default for bash users via
   `/etc/profile.d/tpu-defaults.sh` to set TPU env vars (defaulting to device
   0).
+- Fixed TPU log directory permissions permanently via `tmpfiles.d` so
+  `/tmp/tpu_logs/` is created world-writable with sticky bit on every boot.
