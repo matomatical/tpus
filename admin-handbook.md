@@ -215,11 +215,19 @@ ssh-keygen -t ed25519 -f ~/.ssh/mfr-tpu -C <USERNAME>
 ```
 
 The key will have format `ssh-ed25519 BLAHBLAH etc`, take the `BLAHBLAH` bit
-only and their chosen username and run it through the user creation script on
-each TPU VM. For example:
+only and their chosen username and run it through the user creation script from
+any VM (e.g. tpu0). The script creates the user on all 4 VMs, sets up their
+external SSH key, and generates intra-cluster SSH keys so they can `ssh tpuX`
+between VMs. For example:
 
 ```
-sudo ./adduser.sh afiq AAAAC3NzaC1lZDI1NTE5AAAAINmp4YYoMgXP8MEQsMjkla+o81pwI7hj9EN6eIbFZzvV
+./adduser.sh afiq AAAAC3NzaC1lZDI1NTE5AAAAINmp4YYoMgXP8MEQsMjkla+o81pwI7hj9EN6eIbFZzvV
+```
+
+To set up intra-cluster keys for an existing user (e.g. after re-provisioning):
+
+```
+./setup-cluster-keys.sh <username>
 ```
 
 TPU logging permission
@@ -298,45 +306,28 @@ Maybe do this every few days to stop the memory leak resurfacing.
 
 See `issues-healthagent-oom/` for a detailed bug report.
 
-Configuring intra-cluster keys
-----------------------------
+Configuring intra-cluster SSH
+-----------------------------
 
-Locally:
+All users can `ssh tpuX` between VMs using a system-wide SSH client config
+and per-user cluster keys.
 
-```
-ssh-keygen -t ed25519 -f ~/.ssh/mfr-tpus-all -C "m@far.in.net"
-for t in 0 1 2 3; do scp ~/.ssh/mfr-tpus-all{,.pub} tpu$t:.ssh; done
-```
-
-On each machine:
+Deploy the system-wide config (maps tpu0-tpu3 to internal IPs):
 
 ```
-cat ~/.ssh/mfr-tpus-all.pub >> ~/.ssh/authorized_keys
+for t in 0 1 2 3; do scp conf/cluster-ssh.conf tpu$t:/tmp/; done
+for t in 0 1 2 3; do ssh tpu$t 'sudo mkdir -p /etc/ssh/ssh_config.d && sudo cp /tmp/cluster-ssh.conf /etc/ssh/ssh_config.d/cluster-ssh.conf'; done
 ```
 
-Save this as `~/.ssh/config`:
-
-```
-
-# MFR's tiny TPU cluster
-Host tpu0 tpu1 tpu2 tpu3
-    IdentityFile ~/.ssh/mfr-tpus-all
-    User matt
-Host tpu0
-    HostName 10.130.0.12
-Host tpu1
-    HostName 10.130.0.11
-Host tpu2
-    HostName 10.130.0.10
-Host tpu3
-    HostName 10.130.0.13
-```
+Per-user cluster keys are set up automatically by `adduser.sh`. For existing
+users, use `setup-cluster-keys.sh`.
 
 ### Trouble: Bad configuration option
 
 For some very weird reason, the ssh tool on the TPUs doesn't see the first byte
-of the config file. This often led me to a parse error. The above has an empty
-line as the first byte which seems to fix it.
+of the config file. This often led me to a parse error. Config files should
+start with a leading blank line as a workaround (both `cluster-ssh.conf` and
+any `~/.ssh/config` files).
 
 I confirmed there were no weird bytes with `od -c ~/.ssh/config`.
 

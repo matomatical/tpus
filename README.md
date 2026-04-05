@@ -29,14 +29,9 @@ Repo contents
 TODO
 ----
 
-* [ ] Set up intra-cluster SSH for all users (see `issues/inter-vm-ssh/plan.md`)
+* [x] Set up intra-cluster SSH for all users (see `issues/inter-vm-ssh/plan.md`)
 * [x] Instructions for making TPU VMs work with pytorch
-* [x] Make tpu-device optional by default: Configure user profiles to export
-  environment variables that bound TPUs to the current VM, and maybe to a
-  single device, so that the default behaviour without tpu-device prefix is not
-  to hang. Simplify the user-handbook instructions to this effect, except to
-  clarify in the advanced config section that this should be preserved when
-  customising user profiles.
+* [x] Make tpu-device optional by default
 * [ ] TPU queueing system: install or develop some simple system that makes it
   easier to launch large numbers of TPU job scripts for each user, and then
   they will automatically be launched then TPUs are free.

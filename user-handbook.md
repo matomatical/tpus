@@ -49,9 +49,10 @@ virtual environments and can install other Python versions as needed
 (e.g. `uv venv --python 3.14`).
 
 Each VM has its own independent disk. Your home directory is separate on
-each node—files you create on one VM will not appear on the others. If
-you want to create shared files visible to other users on the same VM,
-you can put them in `/home/shared`.
+each node—files you create on one VM will not appear on the others. You
+can `ssh tpuX` and `scp` between VMs to move files around (see the
+SSH section below). If you want to create shared files visible to other
+users on the same VM, you can put them in `/home/shared`.
 
 The cluster supports both JAX and PyTorch/XLA for TPU workloads. See the setup
 sections below for each framework.
@@ -143,6 +144,19 @@ Note: These IP addresses might need to be updated from time to time. If
 the login command suddenly stops working, let me know and I will double
 check this.
 
+### SSH between VMs
+
+Your account is set up with intra-cluster SSH keys, so you can also SSH
+between VMs directly. From any VM, just use:
+
+```
+ssh tpu2            # open a shell on tpu2
+scp file.txt tpu3:  # copy a file to tpu3
+```
+
+This is handy for copying files between VMs, or for setting up your
+environment on multiple VMs at once.
+
 Working with files
 ------------------
 
@@ -227,15 +241,12 @@ the simpler steps below.
      IdentitiesOnly yes
    ```
 
-4. Copy the key and config to the other VMs using `scp` from your
-   local machine:
+4. Copy the key and config to the other VMs. You can do this directly
+   from tpu0 using inter-VM SSH:
 
    ```
-   scp tpu0:.ssh/github tpu1:.ssh/github
-   scp tpu0:.ssh/github.pub tpu1:.ssh/github.pub
+   for t in 1 2 3; do scp ~/.ssh/github{,.pub} ~/.ssh/config tpu$t:.ssh/; done
    ```
-
-   Repeat for `tpu2` and `tpu3` as needed.
 
 Setting up a virtual environment
 --------------------------------
@@ -553,8 +564,12 @@ Customising your shell and tools
 
 If you have preferences for your shell (zsh, etc.), editor (vim, etc.), or
 other dotfiles, you are free to set them up. Just remember that each VM is
-independent — you'll need to configure each one, or copy your dotfiles across
-with `scp`.
+independent — you'll need to configure each one, or copy your dotfiles across.
+For example, from tpu0:
+
+```
+for t in 1 2 3; do scp ~/.zshrc tpu$t:; done
+```
 
 Note that if you switch from bash to another shell (e.g. zsh) you might not get
 the default environment variables. You should therefore add something like the

@@ -51,3 +51,7 @@ April 5, 2026:
   0).
 - Fixed TPU log directory permissions permanently via `tmpfiles.d` so
   `/tmp/tpu_logs/` is created world-writable with sticky bit on every boot.
+- Added inter-VM SSH for all users: system-wide SSH client config
+  (`cluster-ssh.conf`), per-user cluster key generation
+  (`setup-cluster-keys.sh`), and integrated key setup into `adduser.sh`
+  so new users get inter-VM SSH automatically from a single VM.
