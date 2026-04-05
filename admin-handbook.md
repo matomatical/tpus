@@ -518,7 +518,8 @@ Note: it adds stuff to zshrc to get onto path.
 Installing apps can then use -g because that is still only me:
 
 ```
-
+npm install -g @google/gemini-cli # google gemini
+npm install -g @openai/codex      # openai codex
 ```
 
 If I needed to install node system packages globally? Hope I never face that

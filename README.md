@@ -76,9 +76,18 @@ April 2026, backend stability improvements:
 Future
 ------
 
+Persistent shared storage
+
+* [x] Consider various options (see issues/storage-options.md)
+  -> try JuiceFS + GCS
+* [x] Research deployment rollout plan, cost estimates etc.
+* [ ] Create bucket, install and configure JuiceFS
+* [ ] Run benchmarks and validate acceptable performance
+* [ ] Mount and port user home directories
+* [ ] Set up monitoring of health, cache size, and cost
+
 Ambitious new features:
 
-* [ ] Persistent and shared storage. Decide on something and run with it.
 * [ ] TPU queueing system: install or develop some simple system that makes it
   easier to launch large numbers of TPU job scripts for each user, and then
   they will automatically be launched when TPUs are free.
