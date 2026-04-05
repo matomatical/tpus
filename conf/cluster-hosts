@@ -1,0 +1,5 @@
+# TPU cluster internal hostnames
+10.130.0.12 tpu0
+10.130.0.11 tpu1
+10.130.0.10 tpu2
+10.130.0.13 tpu3

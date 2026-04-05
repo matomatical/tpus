@@ -1,0 +1,11 @@
+[Unit]
+Description=TPU Heartbeat — log device status to disk
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/shared/tpu-heartbeat.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

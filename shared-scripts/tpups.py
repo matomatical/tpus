@@ -9,12 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 # # # 
 # CONFIGURATION
 
-TPU_HOSTS = [
-    "10.130.0.12",
-    "10.130.0.11",
-    "10.130.0.10",
-    "10.130.0.13",
-]
+TPU_HOSTS = ["tpu0", "tpu1", "tpu2", "tpu3"]
 
 PORT = 8080
 

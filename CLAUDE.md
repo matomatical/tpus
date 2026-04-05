@@ -55,3 +55,17 @@ April 5, 2026:
   (`cluster-ssh.conf`), per-user cluster key generation
   (`setup-cluster-keys.sh`), and integrated key setup into `adduser.sh`
   so new users get inter-VM SSH automatically from a single VM.
+- Replaced `nohup` heartbeat and HTTP server with systemd services
+  (`tpu-heartbeat.service`, `tpu-heartbeat-web.service`) for automatic
+  restart on crash or reboot.
+- Added weekly systemd timer to restart healthAgent and prevent OOM
+  memory leak from recurring.
+- Created `tpu-health` script: checks disk usage, heartbeat freshness,
+  service status, and healthAgent memory.
+- Added `tpups` to login MOTD; cleaned up Ubuntu MOTD ads.
+- Centralised cluster IPs in `/etc/hosts` (`conf/cluster-hosts`),
+  simplified SSH config and removed hardcoded IPs from Python scripts.
+- Hardened `/home/shared` to root-owned 755 (was world-writable 777).
+- Added `fetch-logs.sh` admin script for backing up heartbeat history.
+- Overhauled admin handbook: all commands now use SSH loops from the
+  repo instead of "on each VM" manual steps.

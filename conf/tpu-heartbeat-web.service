@@ -1,0 +1,11 @@
+[Unit]
+Description=TPU Heartbeat — HTTP server for status.json and history.csv
+After=tpu-heartbeat.service
+
+[Service]
+ExecStart=/usr/bin/python3 -m http.server 8080 --directory /home/shared/heartbeat
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

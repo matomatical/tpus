@@ -1,0 +1,6 @@
+[Unit]
+Description=Restart healthAgent to prevent OOM memory leak
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl restart healthagent.service

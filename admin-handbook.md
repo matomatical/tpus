@@ -38,24 +38,19 @@ soon as one becomes available.
 After provisioning, verify the key stats from each VM:
 
 ```
-# CPU model and core count
-cat /proc/cpuinfo | grep "model name" | head -1
-nproc
-
-# Memory
-free -h
-
-# Disk
-df -h /
-
-# TPU devices (should show accel0-3 on each VM)
-ls /dev/accel*
-
-# OS version
-lsb_release -d
-
-# TPU devices visible to JAX (shows 1 of 4 per-VM devices)
-tpu-device 0 python3 -c "import jax; print(jax.devices())"
+for t in 0 1 2 3; do
+  echo "=== tpu$t ==="
+  # CPU model and core count
+  ssh tpu$t 'cat /proc/cpuinfo | grep "model name" | head -1 && nproc'
+  # Memory
+  ssh tpu$t 'free -h'
+  # Disk
+  ssh tpu$t 'df -h /'
+  # TPU devices (should show accel0-3 on each VM)
+  ssh tpu$t 'ls /dev/accel*'
+  # OS version
+  ssh tpu$t 'lsb_release -d'
+done
 ```
 
 ### Trouble: TPU version
@@ -79,7 +74,7 @@ Add key to cluster with GCP console (compute > metadata > ssh keys).
 Configure `~/.ssh/config` (get IP addresses from GCP console):
 
 ```ssh_config
-# MFR's tiny TPU cluster
+## MFR's tiny TPU cluster
 Host tpu0 tpu1 tpu2 tpu3
     IdentityFile ~/.ssh/mfr-tpus
     User matt
@@ -97,18 +92,23 @@ Now you can ssh into the TPU VMs with `ssh tpuX` for `X` in `0123`.
 
 ### Trouble: Identity verification issue
 
-The login will be blocked if they same IPs are used as an old machine. Delete
-the offending rows from `.ssh/config/known_hosts`.
+The login will be blocked if the same IPs are used as an old machine. Remove
+the stale host keys with:
+
+```
+for t in 0 1 2 3; do ssh-keygen -R tpu$t; done
+```
 
 Upgrading system packages
 -------------------------
 
-On each VM:
-
 ```
-sudo apt update
-sudo apt upgrade
-sudo apt autoremove
+for t in 0 1 2 3; do
+  echo "=== tpu$t ==="
+  ssh tpu$t 'sudo apt update && sudo apt upgrade -y && sudo apt autoremove -y'
+done
+# Restart remote VMs first, then local VM last
+for t in 1 2 3; do ssh tpu$t 'sudo shutdown -r now'; done
 sudo shutdown -r now
 ```
 
@@ -149,7 +149,10 @@ Install uv as a standalone binary
 ([docs](https://docs.astral.sh/uv/getting-started/installation/)):
 
 ```
-curl -LsSf https://astral.sh/uv/install.sh | sudo sh
+for t in 0 1 2 3; do
+  echo "=== tpu$t ==="
+  ssh tpu$t 'curl -LsSf https://astral.sh/uv/install.sh | sudo sh'
+done
 ```
 
 
@@ -169,39 +172,51 @@ system Python.
 Installing custom scripts
 -------------------------
 
-On each TPU VM:
-
 ```
-sudo mkdir -p /home/shared
-sudo chmod +777 /home/shared
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo mkdir -p /home/shared && sudo chmod 755 /home/shared'
+done
 ```
 
 From local to each TPU VM:
 
 ```
-for t in 0 1 2 3; do scp admin-scripts/* tpu$t: ; done
-for t in 0 1 2 3; do scp shared-scripts/* tpu$t:/home/shared/; done
+for t in 0 1 2 3; do
+  scp shared-scripts/* tpu$t:/tmp/
+  ssh tpu$t 'sudo cp /tmp/tpu-*.sh /tmp/tpu-*.py /tmp/tpups.py /home/shared/'
+done
 ```
 
-On each TPU VM:
-
 ```
-chmod +x adduser.sh
-chmod +x /home/shared/tpu-device.sh
-sudo ln -s /home/shared/tpu-device.sh /usr/local/bin/tpu-device
-chmod +x /home/shared/tpups.py
-sudo ln -s /home/shared/tpups.py /usr/local/bin/tpups
-chmod +x /home/shared/tpu-usage.py
-sudo ln -s /home/shared/tpu-usage.py /usr/local/bin/tpu-usage
-chmod +x /home/shared/tpu-heatmap.py
-sudo ln -s /home/shared/tpu-heatmap.py /usr/local/bin/tpu-heatmap
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo chmod +x /home/shared/tpu-device.sh /home/shared/tpups.py /home/shared/tpu-usage.py /home/shared/tpu-heatmap.py /home/shared/tpu-health.py'
+  ssh tpu$t 'sudo ln -sf /home/shared/tpu-device.sh /usr/local/bin/tpu-device'
+  ssh tpu$t 'sudo ln -sf /home/shared/tpups.py /usr/local/bin/tpups'
+  ssh tpu$t 'sudo ln -sf /home/shared/tpu-usage.py /usr/local/bin/tpu-usage'
+  ssh tpu$t 'sudo ln -sf /home/shared/tpu-heatmap.py /usr/local/bin/tpu-heatmap'
+  ssh tpu$t 'sudo ln -sf /home/shared/tpu-health.py /usr/local/bin/tpu-health'
+done
 ```
 
-Set up heartbeat, tpups, and server:
+Install `tpups` into the login MOTD so users see cluster status on SSH login.
+This is a **copy** (not a symlink) so that `/home/shared/` modifications can't
+get code execution as root via MOTD:
 
 ```
-nohup python3 /home/shared/tpu-heartbeat.py > heartbeat.log 2>&1 &
-nohup python3 -m http.server 8080 --directory /home/shared/heartbeat > /dev/null 2>&1 &
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo cp /home/shared/tpups.py /etc/update-motd.d/99-tpups'
+done
+```
+
+Set up heartbeat and status web server as systemd services:
+
+```
+for t in 0 1 2 3; do
+  scp conf/tpu-heartbeat.service conf/tpu-heartbeat-web.service tpu$t:/tmp/
+  ssh tpu$t 'sudo cp /tmp/tpu-heartbeat.service /tmp/tpu-heartbeat-web.service /etc/systemd/system/'
+  ssh tpu$t 'sudo systemctl daemon-reload'
+  ssh tpu$t 'sudo systemctl enable --now tpu-heartbeat.service tpu-heartbeat-web.service'
+done
 ```
 
 Adding new users
@@ -240,8 +255,11 @@ directory is created with mode 1777 (world-writable + sticky bit, like `/tmp`
 itself) on every boot:
 
 ```
-for t in 0 1 2 3; do scp conf/tpu-logs.conf tpu$t:/tmp/; done
-for t in 0 1 2 3; do ssh tpu$t 'sudo cp /tmp/tpu-logs.conf /etc/tmpfiles.d/tpu-logs.conf && sudo systemd-tmpfiles --create'; done
+for t in 0 1 2 3; do
+  scp conf/tpu-logs.conf tpu$t:/tmp/
+  ssh tpu$t 'sudo cp /tmp/tpu-logs.conf /etc/tmpfiles.d/tpu-logs.conf'
+  ssh tpu$t 'sudo systemd-tmpfiles --create'
+done
 ```
 
 System log size limits
@@ -266,8 +284,10 @@ limit). Install a custom logrotate config that rotates these daily and also at
 100MB:
 
 ```
-for t in 0 1 2 3; do scp conf/logrotate-rsyslog.conf tpu$t:/tmp/; done
-for t in 0 1 2 3; do ssh tpu$t 'sudo cp /tmp/logrotate-rsyslog.conf /etc/logrotate.d/rsyslog'; done
+for t in 0 1 2 3; do
+  scp conf/logrotate-rsyslog.conf tpu$t:/tmp/
+  ssh tpu$t 'sudo cp /tmp/logrotate-rsyslog.conf /etc/logrotate.d/rsyslog'
+done
 ```
 
 ### Configuring journalctl
@@ -302,21 +322,36 @@ and then floods `kern.log` with OOM messages because it is configured with
 sudo systemctl restart healthagent.service
 ```
 
-Maybe do this every few days to stop the memory leak resurfacing.
+To prevent this from recurring, a weekly systemd timer automatically restarts
+the container. Deploy it:
 
-See `issues-healthagent-oom/` for a detailed bug report.
+```
+for t in 0 1 2 3; do
+  scp conf/healthagent-restart.service conf/healthagent-restart.timer tpu$t:/tmp/
+  ssh tpu$t 'sudo cp /tmp/healthagent-restart.service /tmp/healthagent-restart.timer /etc/systemd/system/'
+  ssh tpu$t 'sudo systemctl daemon-reload'
+  ssh tpu$t 'sudo systemctl enable --now healthagent-restart.timer'
+done
+```
+
+See `issues/healthagent-oom/` for a detailed bug report.
 
 Configuring intra-cluster SSH
 -----------------------------
 
-All users can `ssh tpuX` between VMs using a system-wide SSH client config
-and per-user cluster keys.
+All users can `ssh tpuX` between VMs using `/etc/hosts` for name resolution,
+a system-wide SSH client config for the identity file, and per-user cluster
+keys.
 
-Deploy the system-wide config (maps tpu0-tpu3 to internal IPs):
+Deploy cluster hostnames to `/etc/hosts` and the SSH config:
 
 ```
-for t in 0 1 2 3; do scp conf/cluster-ssh.conf tpu$t:/tmp/; done
-for t in 0 1 2 3; do ssh tpu$t 'sudo mkdir -p /etc/ssh/ssh_config.d && sudo cp /tmp/cluster-ssh.conf /etc/ssh/ssh_config.d/cluster-ssh.conf'; done
+for t in 0 1 2 3; do
+  scp conf/cluster-hosts conf/cluster-ssh.conf tpu$t:/tmp/;
+  ssh tpu$t 'cat /tmp/cluster-hosts | sudo tee -a /etc/hosts > /dev/null';
+  ssh tpu$t 'sudo mkdir -p /etc/ssh/ssh_config.d';
+  ssh tpu$t 'sudo cp /tmp/cluster-ssh.conf /etc/ssh/ssh_config.d/cluster-ssh.conf';
+done
 ```
 
 Per-user cluster keys are set up automatically by `adduser.sh`. For existing
@@ -336,6 +371,9 @@ I think that's unlikely because I think the SSH version is up to date?
 
 Anyway it doesn't seem to be a wider problem so I'll just leave it...
 
+Update: Later, I can't seem to reproduce this. So just use blank line or double
+comment for now.
+
 Miscelaneous issues
 -------------------
 
@@ -349,8 +387,9 @@ The warning shows up thus:
 Fix it by installing the missing locale:
 
 ```
-sudo locale-gen en_AU.UTF-8
-sudo update-locale LANG=en_AU.UTF_8
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo locale-gen en_AU.UTF-8 && sudo update-locale LANG=en_AU.UTF-8'
+done
 ```
 
 Default TPU environment variables
@@ -364,8 +403,10 @@ safe defaults (single device on the current VM) for all bash login shells.
 Deploy the config to each VM:
 
 ```
-for t in 0 1 2 3; do scp conf/tpu-defaults.sh tpu$t:/tmp/; done
-for t in 0 1 2 3; do ssh tpu$t 'sudo cp /tmp/tpu-defaults.sh /etc/profile.d/tpu-defaults.sh'; done
+for t in 0 1 2 3; do
+  scp conf/tpu-defaults.sh tpu$t:/tmp/
+  ssh tpu$t 'sudo cp /tmp/tpu-defaults.sh /etc/profile.d/tpu-defaults.sh'
+done
 ```
 
 Note: `/etc/profile.d/` is only sourced by bash (and sh) login shells. Zsh does
@@ -407,54 +448,37 @@ happen on my laptop?). A simpler solution seems to be to add this to
 ~/.ssh/config on each VM:
 
 ```
-# GitHub keys
+## GitHub keys
 Host github.com
   User git
   IdentityFile ~/.ssh/{name-of-your-key}
   IdentitiesOnly yes
 ```
 
-Remember to watch out for the SSH parser bug.
-
 ### Installing neovim
 
-On each vm:
-
 ```
-sudo apt install neovim
-mkdir -p ~/.config/nvim
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo apt install -y neovim && mkdir -p ~/.config/nvim'
+  scp home-stuff/init.vim tpu$t:.config/nvim/init.vim
+done
 ```
-
-Copy my config from local:
-```
-for t in 0 1 2 3; do scp -r home-stuff/init.vim tpu$t:.config/nvim/init.vim ; done
-```
-
 
 ### Installing zsh
 
-On each VM:
-
 ```
-sudo apt install zsh
-sudo chsh -s $(which zsh) $(whoami)
-```
-
-Copy my config from local:
-```
-for t in 0 1 2 3; do scp -r home-stuff/zshrc.zshrc tpu$t:.zshrc ; done
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo apt install -y zsh && sudo chsh -s $(which zsh) matt'
+  scp home-stuff/zshrc.zshrc tpu$t:.zshrc
+done
 ```
 
-### Other packages:
-
-Other packages:
+### Other packages
 
 ```
-sudo apt install ffmpeg
-sudo apt install pandoc
-sudo apt install entr
-sudo apt install texlive-latex-extra
-sudo apt install latexmk
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo apt install -y ffmpeg pandoc entr texlive-latex-extra latexmk'
+done
 ```
 
 LaTeX has various distributions with various sizes, I went for something short

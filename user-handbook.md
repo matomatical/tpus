@@ -51,8 +51,7 @@ virtual environments and can install other Python versions as needed
 Each VM has its own independent disk. Your home directory is separate on
 each node—files you create on one VM will not appear on the others. You
 can `ssh tpuX` and `scp` between VMs to move files around (see the
-SSH section below). If you want to create shared files visible to other
-users on the same VM, you can put them in `/home/shared`.
+SSH section below).
 
 The cluster supports both JAX and PyTorch/XLA for TPU workloads. See the setup
 sections below for each framework.
