@@ -456,13 +456,14 @@ for t in 0 1 2 3; do scp -r home-stuff/zshrc.zshrc tpu$t:.zshrc ; done
 
 ### Other packages:
 
-Other packages (currently only installed on TPU0):
+Other packages:
 
 ```
 sudo apt install ffmpeg
 sudo apt install pandoc
 sudo apt install entr
 sudo apt install texlive-latex-extra
+sudo apt install latexmk
 ```
 
 LaTeX has various distributions with various sizes, I went for something short
