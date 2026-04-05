@@ -46,3 +46,6 @@ April 5, 2026:
 
 - Reverted system Python from 3.14 back to 3.10 and switched to standalone uv
   for Python version management.
+- Made tpu-device optional by default for bash users via
+  `/etc/profile.d/tpu-defaults.sh` to set TPU env vars (defaulting to device
+  0).

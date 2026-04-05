@@ -371,6 +371,27 @@ sudo locale-gen en_AU.UTF-8
 sudo update-locale LANG=en_AU.UTF_8
 ```
 
+Default TPU environment variables
+---------------------------------
+
+By default, JAX and PyTorch/XLA try to coordinate across all 4 VMs in the pod,
+which causes programs to hang if they aren't launched with the right environment
+variables. To prevent this, we install a `/etc/profile.d/` script that sets
+safe defaults (single device on the current VM) for all bash login shells.
+
+Deploy the config to each VM:
+
+```
+for t in 0 1 2 3; do scp conf/tpu-defaults.sh tpu$t:/tmp/; done
+for t in 0 1 2 3; do ssh tpu$t 'sudo cp /tmp/tpu-defaults.sh /etc/profile.d/tpu-defaults.sh'; done
+```
+
+Note: `/etc/profile.d/` is only sourced by bash (and sh) login shells. Zsh does
+not source it, so zsh users (i.e. me) need the same exports in their `.zshrc`.
+These are already included in `home-stuff/zshrc.zshrc`.
+
+Users can still use `tpu-device` to override these defaults and target specific
+devices or multiple devices.
 
 Making myself at home
 ---------------------

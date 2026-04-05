@@ -388,36 +388,37 @@ input("press enter to release devices...")
 Remember to initialise your virtual environment following the instructions
 above and make sure the venv is active.
 
-Then, run the script on a single device `DEVICE` (which could be `0`, `1`, `2`,
-or `3` on the current VM):
+Then, run the script:
 
 ```
-tpu-device DEVICE python hello.py
+python hello.py
 ```
 
-For example, to run the script on device `2`:
+By default, this will run on device 0 of the current VM. To run on a
+different device (e.g. device 2), use the `tpu-device` wrapper:
 
 ```
 tpu-device 2 python hello.py
 ```
 
-Don't forget `tpu-device`!
---------------------------
+Use `tpups` to check which devices are free before choosing one.
 
-The command prefix `tpu-device` in the above examples is important.
-This is a command wrapper that sets some environment variables such that
-the code only tries to run on the specified TPU device(s) within the
-current VM.
+Choosing a TPU device
+---------------------
 
-If you forget `tpu-device` and don't otherwise set the environment
-variables, for example if you just run `python hello.py`, then JAX will
-not be able to initialise itself as it will try to coordinate with the
-other TPU VMs. The program will completely freeze.
+Your shell is configured with default environment variables that target
+device 0 on the current VM. This means you can run TPU programs
+directly without any special prefix, and they will use device 0.
 
-If your program freezes like this, you will probably have to kill it
-manually (Ctrl-C might not be enough). Try SSHing into the same VM in
-another window, run `tpups` to get the process ID (`PID` field) for
-your frozen script, and run `kill PID`.
+To use a different device, prefix your command with `tpu-device`:
+
+```
+tpu-device 2 python hello.py
+```
+
+If another user is already using device 0, your program will usually
+crash immediately with an error (rather than hanging). Use `tpups` to
+see which devices are free.
 
 Policies
 ========
@@ -481,6 +482,20 @@ Advanced
 What is `tpu-device`?
 ---------------------
 
+The cluster is configured so that the following environment variables are set
+by default:
+
+```
+TPU_CHIPS_PER_PROCESS_BOUNDS=1,1,1
+TPU_PROCESS_BOUNDS=1,1,1
+TPU_VISIBLE_DEVICES=0
+PJRT_DEVICE=TPU
+```
+
+When JAX or PyTorch/XLA launches, it checks these environment variables to
+determine which parts of the cluster to target.
+
+The `tpu-device` wrapper overrides these variables to target specific devices.
 The wrapped command `tpu-device <DEVICE> <command>` is essentially equivalent
 to:
 
@@ -489,20 +504,20 @@ TPU_CHIPS_PER_PROCESS_BOUNDS=1,1,1 TPU_PROCESS_BOUNDS=1,1,1 TPU_VISIBLE_DEVICES=
 ```
 
 Putting `X=Y` before a command like this has the effect of setting environment
-variable `X` to the value `Y` during the execution of this command. When JAX
-or PyTorch/XLA launches it checks the above environment variables to see which
-parts of the cluster it should target. By default, the environment variables
-are such that JAX will try to connect all 16 devices across all 4 VMs, which is
-why it stalls.
+variable `X` to the value `Y` during the execution of this command.
 
-This is not the only way to set the environment variables. For your
-information, a couple of alternatives are the following.
+You can also set these environment variables yourself if you prefer. For
+example:
 
-* Run commands like `export TPU_CHIPS_PER_PROCESS_BOUNDS=1,1,1` etc.,
-  once per shell session.
-* Add these `export` commands to your bash/zsh profile.
-* Set the environment variables from within Python before you import
-  JAX or PyTorch/XLA, using `os.environ`.
+* Run commands like `export TPU_VISIBLE_DEVICES=2` etc., once per
+  shell session.
+* Add these `export` commands to your bash/zsh profile (the above defaults are
+  set by adding these to the system-wide bash profile).
+* Set them from within Python before you import JAX or PyTorch/XLA,
+  using `os.environ`.
+
+**Important:** If you customise your shell profile (`.bashrc`, `.zshrc`,
+etc.), make sure you don't override these TPU environment variables.
 
 Using multiple devices on one TPU VM
 ------------------------------------
@@ -523,17 +538,34 @@ combinations like `0,2`.
 If you want to actually use all four devices you would then need to write your
 JAX code to use `jax.pmap`.
 
+Using multiple devices on multiple TPU VMs
+------------------------------------------
+
 In principle it is also possible to run one command across multiple VMs,
 however I haven't set this up before so don't know how to do it. If you need
-this, feel free to look into it and try it (presuming the TPUs are free).
+this, feel free to look into it and try it (presuming the TPUs are free). You
+will need to figure out the appropriate combination of environment variables
+and override the defaults, which stop the TPUs from trying to talk to
+each-other.
 
 Customising your shell and tools
 --------------------------------
 
-If you have preferences for your shell (zsh, etc.), editor (vim, etc.),
-or other dotfiles, you are free to set them up. Just remember that each
-VM is independent — you'll need to configure each one, or copy your
-dotfiles across with `scp`.
+If you have preferences for your shell (zsh, etc.), editor (vim, etc.), or
+other dotfiles, you are free to set them up. Just remember that each VM is
+independent — you'll need to configure each one, or copy your dotfiles across
+with `scp`.
+
+Note that if you switch from bash to another shell (e.g. zsh) you might not get
+the default environment variables. You should therefore add something like the
+following to your profile:
+
+```
+export TPU_CHIPS_PER_PROCESS_BOUNDS=1,1,1
+export TPU_PROCESS_BOUNDS=1,1,1
+export TPU_VISIBLE_DEVICES=0
+export PJRT_DEVICE=TPU
+```
 
 Graduating to your own cluster
 ------------------------------
