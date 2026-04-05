@@ -1,6 +1,18 @@
 Initialising a TPU VM
 =====================
 
+Budget alerts
+-------------
+
+Notes:
+
+* I configured a "budget" for all GCP usage at 200 GBP per month.
+  * I should get alerts at 10% and a few other larger thresholds each month.
+* I tried to configure an automatic response to exceeding the budget to disable
+  cloud billing, but I was unable to test it and unsure if it will work if this
+  happens.
+
+
 Provisioning
 ------------
 
