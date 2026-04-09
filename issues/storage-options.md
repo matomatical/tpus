@@ -329,7 +329,7 @@ sudo apt install -y redis-server
 Edit `/etc/redis/redis.conf`:
 
 ```
-bind <tpu0-internal-ip>  # or 0.0.0.0 with firewall
+bind 127.0.0.1 <tpu0-internal-ip>  # both localhost and internal network
 requirepass <REDIS_PASSWORD>
 maxmemory-policy noeviction  # CRITICAL: JuiceFS requires this
 appendonly yes
@@ -345,14 +345,14 @@ Verify: `redis-cli -a <password> ping` should return PONG.
 #### GCS bucket
 
 ```bash
-gcloud storage buckets create gs://mfr-juicefs-data \
+gcloud storage buckets create gs://mfrs-tpu-cluster \
   --location=<TPU_REGION> \
   --uniform-bucket-level-access
 ```
 
 Verify TPU VM service account has access:
 ```bash
-gcloud storage ls gs://mfr-juicefs-data/
+gcloud storage ls gs://mfrs-tpu-cluster/
 ```
 
 #### Format filesystem (once, from any node)
@@ -360,9 +360,16 @@ gcloud storage ls gs://mfr-juicefs-data/
 ```bash
 juicefs format \
   --storage gs \
-  --bucket mfr-juicefs-data \
+  --bucket mfrs-tpu-cluster \
+  --capacity 1000 \
   "redis://:${REDIS_PASSWORD}@tpu0:6379/0" \
   clusterhome
+```
+
+This sets a 1000 GiB filesystem limit. Writes fail with ENOSPC when full.
+To expand later (no downtime, no reformat):
+```bash
+juicefs config "redis://:${REDIS_PASSWORD}@tpu0:6379/0" --capacity 2000
 ```
 
 #### Mount (each node)
@@ -377,6 +384,7 @@ sudo juicefs mount \
   --cache-size 40960 \
   --buffer-size 600 \
   --writeback \
+  --upload-delay 1m \
   --allow-other \
   -d
 ```
@@ -402,7 +410,7 @@ Wants=network-online.target
 What=redis://:PASSWORD@tpu0:6379/0
 Where=/jfs
 Type=juicefs
-Options=_netdev,allow-other,cache-dir=/var/jfsCache,cache-size=40960,buffer-size=600,writeback
+Options=_netdev,allow-other,cache-dir=/var/jfsCache,cache-size=40960,buffer-size=600,writeback,upload-delay=1m
 
 [Install]
 WantedBy=remote-fs.target
@@ -450,7 +458,7 @@ against local disk baseline to understand the overhead.
 redis-cli -h tpu0 -a <password> --latency
 
 # GCS backend speed (bypasses FUSE and metadata)
-juicefs objbench gs://mfr-juicefs-data/objbench/
+juicefs objbench gs://mfrs-tpu-cluster/objbench/
 
 # Local disk baseline
 juicefs bench /tmp/local-bench --big-file-size 256 --small-file-count 500
@@ -580,7 +588,7 @@ template if we want it later.
 | Automatic | Metadata backup to GCS (hourly, by JuiceFS client)|
 | Daily     | `juicefs dump` to local backup (cron on tpu0)     |
 | Weekly    | `juicefs gc --compact` (defragment slices)         |
-| Monthly   | `juicefs gc --delete` (clean orphaned GCS objects) |
+| Monthly   | `juicefs gc --delete` (clean orphaned GCS objects, run manually at first) |
 | Monthly   | `juicefs fsck` (consistency check)                 |
 
 Daily metadata dump cron (on tpu0):
@@ -690,18 +698,26 @@ If using a us-central2 bucket (same region as VMs), egress should be free
 and total cost should be ~$2-3/month. Verify with billing reports after a
 small test transfer.
 
+### Resolved questions
+
+* **`--writeback`**: Yes, use it. If a node hard-crashes, losing the last
+  30-60s of a text log is acceptable — we'd restart from the last checkpoint
+  anyway. The write performance boost is worth it.
+* **`--upload-delay`**: Yes, use `--upload-delay 1m`. Requires `--writeback`.
+  Batches small appends (e.g. W&B, training logs) into fewer GCS objects,
+  reducing Class A operation costs and slice fragmentation. JuiceFS will
+  still upload early if cache space runs low.
+* **Hybrid checkpointing**: Not needed initially. If models grow past a few
+  GB, write checkpoints directly to `gs://` via JAX/Orbax to avoid cache
+  thrashing. Revisit later.
+
 ### Open questions
 
-* Should we use `--writeback` in production? Faster writes but risk of data
-  loss if a node crashes before upload. Our training logs aren't critical
-  enough to warrant the performance hit of synchronous writes, so probably yes.
-* Should we set `--upload-delay`? Batches small writes into fewer GCS objects,
-  reducing cost and fragmentation. Worth testing with a value like 30s.
-* Hybrid checkpointing: JAX/Orbax can write checkpoints directly to `gs://`
-  paths. Worth doing if checkpoints are large enough to cause cache pressure,
-  but probably not needed initially with small models.
-* What mount path? `/jfs` is simple. `/cluster/home` matches the old NFS
-  convention. Either works.
+* What mount path? `/jfs` is simple. Decide during setup.
+* **`juicefs gc --delete`**: Run manually the first few times before putting
+  it in a cron job, to verify it's not deleting anything unexpected. Running
+  `juicefs gc` without `--delete` is already a check-only scan (there is no
+  `--dry-run` flag).
 
 Technical notes
 ---------------
