@@ -3,6 +3,10 @@ SCRIPT=shared-scripts/tpu-device.sh
 PY=venv/bin/python
 CMD='import jax; print(f"devices: {jax.device_count()}, list: {jax.devices()}")'
 
+echo "=== Testing: cpu ==="
+bash "$SCRIPT" "cpu" "$PY" -c "$CMD" 2>&1
+echo ""
+
 configs=("0" "1" "2" "3" "0,1" "2,3" "0,1,2,3")
 
 for cfg in "${configs[@]}"; do

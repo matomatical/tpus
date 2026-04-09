@@ -60,6 +60,7 @@ April 2026, feature upgrades:
 * [x] tpu-device: optional, default env vars equivalent to `tpu-device 0`.
 * [x] Inter-VM SSH configured by default for all users.
 * [x] `tpups` in MOTD.
+* [x] tpu-device: CPU mode (`tpu-device cpu`) for JAX and PyTorch/XLA.
 
 April 2026, backend stability improvements:
 

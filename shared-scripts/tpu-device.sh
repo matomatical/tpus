@@ -1,15 +1,26 @@
 #!/bin/bash
 
 if [ "$#" -lt 2 ]; then
-    echo "Usage: $0 <DEVICE_IDS> <COMMAND> [ARGS...]"
+    echo "Usage: $0 <DEVICE_IDS|cpu> <COMMAND> [ARGS...]"
     echo "Example: $0 2 python hello.py"
     echo "Example: $0 0,1 python hello.py"
     echo "Example: $0 0,1,2,3 python hello.py"
+    echo "Example: $0 cpu python hello.py"
     exit 1
 fi
 
 DEVICE_IDS=$1
 shift # Remove device IDs from arguments, leaving the command and its args
+
+# handle CPU mode
+if [[ "${DEVICE_IDS,,}" == "cpu" ]]; then
+    export JAX_PLATFORMS=cpu
+    export PJRT_DEVICE=CPU
+    unset TPU_VISIBLE_DEVICES
+    unset TPU_CHIPS_PER_PROCESS_BOUNDS
+    unset TPU_PROCESS_BOUNDS
+    exec "$@"
+fi
 
 # validate: comma-separated list of 0-3
 if [[ ! "$DEVICE_IDS" =~ ^[0-3](,[0-3])*$ ]]; then

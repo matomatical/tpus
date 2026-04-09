@@ -430,6 +430,13 @@ If another user is already using device 0, your program will usually
 crash immediately with an error (rather than hanging). Use `tpups` to
 see which devices are free.
 
+You can also run on CPU only (no TPU), which is useful for quick debugging or
+testing, or when no TPU devices are free:
+
+```
+tpu-device cpu python hello.py
+```
+
 Policies
 ========
 
@@ -512,6 +519,10 @@ to:
 ```
 TPU_CHIPS_PER_PROCESS_BOUNDS=1,1,1 TPU_PROCESS_BOUNDS=1,1,1 TPU_VISIBLE_DEVICES=<DEVICE> PJRT_DEVICE=TPU <command>
 ```
+
+The `tpu-device cpu` option unsets the TPU variables and instead sets
+`JAX_PLATFORMS=cpu` (for JAX) and `PJRT_DEVICE=CPU` (for PyTorch/XLA),
+forcing both frameworks to use CPU only.
 
 Putting `X=Y` before a command like this has the effect of setting environment
 variable `X` to the value `Y` during the execution of this command.
