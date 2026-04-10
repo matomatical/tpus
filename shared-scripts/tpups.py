@@ -3,7 +3,8 @@
 import json
 import time
 import socket
-import requests
+import urllib.request
+import urllib.error
 from concurrent.futures import ThreadPoolExecutor
 
 # # # 
@@ -24,12 +25,12 @@ def fetch_status(host):
     url = f"http://{host}:{PORT}/{ENDPOINT}"
     try:
         # 2-second timeout to prevent hanging on a dead node
-        resp = requests.get(url, timeout=2)
-        resp.raise_for_status()
-        return resp.json()
-    except requests.ConnectionError:
-        return {"host": host, "error": "connection refused"}
-    except requests.Timeout:
+        with urllib.request.urlopen(url, timeout=2) as resp:
+            return json.loads(resp.read())
+    except urllib.error.URLError as e:
+        reason = str(e.reason) if hasattr(e, 'reason') else str(e)
+        return {"host": host, "error": reason}
+    except socket.timeout:
         return {"host": host, "error": "timeout"}
     except Exception as e:
         return {"host": host, "error": str(e)}
