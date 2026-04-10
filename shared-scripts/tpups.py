@@ -27,13 +27,12 @@ def fetch_status(host):
         resp = requests.get(url, timeout=2)
         resp.raise_for_status()
         return resp.json()
+    except requests.ConnectionError:
+        return {"host": host, "error": "connection refused"}
+    except requests.Timeout:
+        return {"host": host, "error": "timeout"}
     except Exception as e:
-        return {
-            "host": host, 
-            "error": str(e),
-            "last_updated": 0,
-            "devices": [],
-        }
+        return {"host": host, "error": str(e)}
 
 # # # 
 # MAIN
@@ -50,7 +49,7 @@ def main():
     # Sort results by node name
     # Filter out nodes that returned errors solely for sorting purposes (keep
     # them for display)
-    results.sort(key=lambda x: x.get('node'))
+    results.sort(key=lambda x: x.get('node') or x.get('host', ''))
 
     # Header
     print(f"\n{'NODE/DEV':<11} {'STAT':<6} {'USER':<7} {'PID':<8} {'TIME':<10} {'COMMAND'}")
@@ -61,7 +60,8 @@ def main():
     for data in results:
         # handle connection errors gracefully
         if "error" in data:
-            print(f"{data['host']:<11} ERROR ({data['error']})")
+            marker = "*" if data['host'] == this_node_name else " "
+            print(f"{marker}{data['host']:<10} ERROR  {data['error']}")
             print("-" * 80)
             continue
 
