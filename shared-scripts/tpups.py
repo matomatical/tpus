@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import sys
 import json
 import time
 import socket
@@ -43,7 +44,7 @@ def main():
     this_node_name = socket.gethostname()
     
     # Fetch statuses in parallel
-    print("Fetching status from cluster...")
+    print("Fetching status from cluster...", file=sys.stderr)
     with ThreadPoolExecutor(max_workers=len(TPU_HOSTS)) as executor:
         results = list(executor.map(fetch_status, TPU_HOSTS))
 
@@ -53,7 +54,8 @@ def main():
     results.sort(key=lambda x: x.get('node') or x.get('host', ''))
 
     # Header
-    print(f"\n{'NODE/DEV':<11} {'STAT':<6} {'USER':<7} {'PID':<8} {'TIME':<10} {'COMMAND'}")
+    print(file=sys.stderr)
+    print(f"{'NODE/DEV':<11} {'STAT':<6} {'USER':<7} {'PID':<8} {'TIME':<10} {'COMMAND'}")
     print("-" * 80)
 
     # Data

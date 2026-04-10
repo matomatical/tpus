@@ -219,6 +219,10 @@ for t in 0 1 2 3; do
 done
 ```
 
+The web server logs to `/dev/shm/tpu-heartbeat-web.log` (tmpfs) rather than
+disk to avoid ext4 journal contention when training jobs are writing heavily.
+Install the logrotate config to cap the log size (see logrotate section below).
+
 Adding new users
 ----------------
 
@@ -285,8 +289,9 @@ limit). Install a custom logrotate config that rotates these daily and also at
 
 ```
 for t in 0 1 2 3; do
-  scp conf/logrotate-rsyslog.conf tpu$t:/tmp/
+  scp conf/logrotate-rsyslog.conf conf/logrotate-heartbeat-web.conf tpu$t:/tmp/
   ssh tpu$t 'sudo cp /tmp/logrotate-rsyslog.conf /etc/logrotate.d/rsyslog'
+  ssh tpu$t 'sudo cp /tmp/logrotate-heartbeat-web.conf /etc/logrotate.d/heartbeat-web'
 done
 ```
 

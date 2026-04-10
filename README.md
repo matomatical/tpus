@@ -62,6 +62,7 @@ April 2026, feature upgrades:
 * [x] `tpups` in MOTD.
 * [x] tpu-device: CPU mode (`tpu-device cpu`) for JAX and PyTorch/XLA.
 * [x] tpups: fail gracefully when servers are unreachable, speed improvements
+* [x] tpu-heartbeat-web: log to tmpfs to avoid ext4 journal contention
 
 April 2026, backend stability improvements:
 

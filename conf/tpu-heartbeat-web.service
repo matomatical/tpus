@@ -4,6 +4,7 @@ After=tpu-heartbeat.service
 
 [Service]
 ExecStart=/usr/bin/python3 -m http.server 8080 --directory /home/shared/heartbeat
+StandardError=append:/dev/shm/tpu-heartbeat-web.log
 Restart=always
 RestartSec=5
 
