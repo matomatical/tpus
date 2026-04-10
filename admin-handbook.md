@@ -504,6 +504,14 @@ Ideally could use tectonic but that does not have an official distribution via
 apt, only snap, and I seem to dislike snap? Could install manually or compile
 it from source if I installed rust. Ah---it is also on brew.
 
+Some extra packages for rendering plots:
+
+```
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo apt install -y cm-super dvipng'
+done
+```
+
 ### Installing NodeJS / apps
 
 Node available from apt is ridiculously old. I went with nvm. This means it's a

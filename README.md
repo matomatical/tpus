@@ -26,7 +26,7 @@ Repo contents
 * `issues/` — bug reports for TPU VM image issues
 * `users.md` — cluster user info
 
-History
+Roadmap
 -------
 
 Most features built with help from Gemini and/or Claude.
@@ -61,6 +61,7 @@ April 2026, feature upgrades:
 * [x] Inter-VM SSH configured by default for all users.
 * [x] `tpups` in MOTD.
 * [x] tpu-device: CPU mode (`tpu-device cpu`) for JAX and PyTorch/XLA.
+* [ ] tpups: speed improvements, fail gracefully when servers are unreachable
 
 April 2026, backend stability improvements:
 
@@ -74,10 +75,7 @@ April 2026, backend stability improvements:
 * [x] `fetch-logs.sh` admin script for backing up heartbeat history.
 * [x] Streamlined admin handbook.
 
-Future
-------
-
-Persistent shared storage
+Major feature: Persistent shared storage
 
 * [x] Consider various options (see issues/storage-options.md)
   -> try JuiceFS + GCS
@@ -87,18 +85,21 @@ Persistent shared storage
 * [ ] Mount and port user home directories
 * [ ] Set up monitoring of health, cache size, and cost
 
-Ambitious new features:
+Major feature: TPU queueing system (prerequisite, persistent shared storage)
 
-* [ ] TPU queueing system: install or develop some simple system that makes it
-  easier to launch large numbers of TPU job scripts for each user, and then
-  they will automatically be launched when TPUs are free.
-* [ ] More AI agents on the cluster; in Slack channel, etc.
+* [ ] install or develop some simple system that makes it easier to launch
+  large numbers of TPU job scripts for each user, and then they will
+  automatically be launched when TPUs are free; users only have to interact
+  with a single VM.
 
-Much more ambitious new features:
+AI agents:
 
-* [ ] AI agents on the cluster can communicate and run their own research.
-* [ ] Command to run code on another TPU VM; all jobs can be managed from one
-  VM.
+* [ ] Autonomous AI agent account on the cluster, basic sysadmin/monitoring
+* [ ] Integrate agents with Slack channel, etc.?
+* [ ] AI agents on the cluster can communicate and run their own research
+
+Scaling up:
+
 * [ ] A single reprovisioning script to set up the entire TPU cluster
 * [ ] Enable the use of pre-emptable TPU VMs
-* [ ] Learn how to make full use of the TPU VMs for a single big training run.
+* [ ] Learn how to make full use of the TPU VMs for a single big training run
