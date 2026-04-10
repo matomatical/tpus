@@ -62,7 +62,6 @@ April 2026, feature upgrades:
 * [x] `tpups` in MOTD.
 * [x] tpu-device: CPU mode (`tpu-device cpu`) for JAX and PyTorch/XLA.
 * [x] tpups: fail gracefully when servers are unreachable, speed improvements
-* [x] tpu-heartbeat-web: log to tmpfs to avoid ext4 journal contention
 
 April 2026, backend stability improvements:
 
@@ -75,6 +74,7 @@ April 2026, backend stability improvements:
   service status, and healthAgent memory.
 * [x] `fetch-logs.sh` admin script for backing up heartbeat history.
 * [x] Streamlined admin handbook.
+* [x] tpu-heartbeat-web: log to tmpfs to avoid ext4 journal contention
 
 Major feature: Persistent shared storage
 
@@ -93,11 +93,12 @@ Major feature: TPU queueing system (prerequisite, persistent shared storage)
   automatically be launched when TPUs are free; users only have to interact
   with a single VM.
 
-AI agents:
+For fun: Bring the server to life with AI agents
 
 * [ ] Autonomous AI agent account on the cluster, basic sysadmin/monitoring
 * [ ] Integrate agents with Slack channel, etc.?
 * [ ] AI agents on the cluster can communicate and run their own research
+* [ ] Pixel art dashboard in the style of https://github.com/pablodelucca/pixel-agents
 
 Scaling up:
 
