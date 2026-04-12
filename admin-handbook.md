@@ -540,6 +540,45 @@ issue, but probably nvm can be configured to handle it. Ideally it is just like
 uv and people can take care of their own environments.
 
 
+Security goals
+--------------
+
+The user handbook promises that non-admin users can't access each other's files
+and that only the admin (matt) has elevated privileges. The users themselves
+are trusted---the threat model is not malicious insiders but rather:
+
+* Innocent mistakes by inexperienced users
+* AI coding agents that users run with too-broad permissions
+* AI coding agents that get exposed to prompt injection attacks
+
+Standard isolation (no sudo, no cross-user file access) limits the blast radius
+of these kinds of incidents. Maintaining this posture is also deliberate
+practice: a security mindset matters more in higher-stakes settings, and this
+cluster is a good low-stakes environment to build the habit.
+
+The key invariants:
+
+* Home directories are `drwxr-x---` (owner-only access).
+* Non-admin users have no sudo access.
+* `/home/shared/` scripts are owned by root and not writable by users. The
+  MOTD script (`/etc/update-motd.d/99-tpups`) is a copy, not a symlink, so
+  modifications to `/home/shared/` can't get code execution as root via MOTD.
+* No user can write to anything that another user executes.
+* In particular, no user can write to anything that `matt` executes, since
+  compromising the admin account grants full sudo access to the cluster.
+
+When adding new shared infrastructure (e.g. shared caches, shared storage),
+**preserve these invariants.** In particular, be cautious about shared writable
+directories whose contents end up on other users' execution paths (e.g. Python
+package caches with symlink mode).
+
+Not currently hardened (standard Linux defaults, acceptable for now):
+
+* `/proc` has no `hidepid`, so users can see each other's process command lines
+  via `ps`. Avoid passing secrets as CLI arguments.
+* No disk quotas or cgroups, so one user could fill the disk or exhaust memory.
+
+
 TODO: External persistent storage
 ---------------------------------
 
