@@ -579,13 +579,37 @@ Not currently hardened (standard Linux defaults, acceptable for now):
 * No disk quotas or cgroups, so one user could fill the disk or exhaust memory.
 
 
-TODO: External persistent storage
----------------------------------
+External persistent storage
+---------------------------
 
-External storage:
+### Provisioning cloud storage bucket
 
-* Persistent disk?
-* GCS FUSE?
+One-time set up the bucket. Storage class standard, non-public bucket.
+
+```bash
+gcloud storage buckets create gs://mfrs-tpu-cluster \
+  --location=us-central2 \
+  --uniform-bucket-level-access
+```
+
+### Create service account for TPU VMs
+
+The TPU VMs don't have access yet. Follow the instructions
+[here](https://docs.cloud.google.com/tpu/docs/storage-buckets).
+
+First create a service account.
+
+```bash
+gcloud beta services identity create --service tpu.googleapis.com --project ace-line-457306-p7
+# -> service-1054593878874@cloud-tpu.iam.gserviceaccount.com
+```
+
+Authorize the service account to read from and write to the buckets:
+
+```bash
+gcloud storage buckets add-iam-policy-binding gs://mfrs-tpu-cluster --member=serviceAccount:service-1054593878874@cloud-tpu.iam.gserviceaccount.com --role=roles/storage.objectViewer
+gcloud storage buckets add-iam-policy-binding gs://mfrs-tpu-cluster --member=serviceAccount:service-1054593878874@cloud-tpu.iam.gserviceaccount.com --role=roles/storage.objectCreator
+```
 
 TODO: Job management
 --------------------
