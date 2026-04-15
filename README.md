@@ -81,7 +81,7 @@ Major feature: Persistent shared storage
 * [x] Consider various options (see issues/storage-options.md)
   -> try JuiceFS + GCS
 * [x] Research deployment rollout plan, cost estimates etc.
-* [ ] Create bucket, install and configure JuiceFS
+* [x] Create bucket, install and configure JuiceFS
 * [ ] Run benchmarks and validate acceptable performance
 * [ ] Mount and port user home directories
 * [ ] Set up monitoring of health, cache size, and cost

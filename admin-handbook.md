@@ -59,6 +59,43 @@ Previously I tried `--version=tpu-vm-base`, but that turned out to be a mistake
 because it was Ubuntu 20 instead of 22. I wasn't even able to install n updated
 version of Python.
 
+### Trouble: Service account and OAuth scopes
+
+The current cluster was provisioned without specifying a service account or
+OAuth scopes, so the VMs use the default Compute Engine service account with a
+limited scope set (notably `devstorage.read_only`). This means user-space
+programs running on the VMs (e.g. JuiceFS) cannot write to GCS via the VM's
+metadata-server credentials — even if the underlying service account has the
+right IAM roles, the OAuth scope caps the tokens the metadata server will
+issue.
+
+Scopes are baked in at VM creation and cannot be changed on a running TPU VM.
+Since a TPU VM can't be stopped/restarted, we can't fix the scopes on the
+existing cluster. The current workaround for JuiceFS is a service account key
+file (see the shared storage section below).
+
+**Next time we provision:** create the service account first (as described in
+the shared storage section), then create the TPU with `--service-account` and
+broad scopes:
+
+```
+gcloud compute tpus tpu-vm create \
+  cluster \
+  --accelerator-type v4-32 \
+  --zone=us-central2-b \
+  --version=tpu-ubuntu2204-base \
+  --service-account=service-1054593878874@cloud-tpu.iam.gserviceaccount.com \
+  --scopes=cloud-platform
+```
+
+Equivalently, in the GCP console TPU creation dialog, choose "Allow full access
+to all Cloud APIs" under access scopes, rather than the default limited set.
+
+TODO: This service account, created as described below, doesn't appear in the
+console settings, maybe because it is a service agent. Will it work via gcloud?
+Or can we use the default service account and attach the permissions to that?
+We can figure this out next time we provision.
+
 SSH config
 ----------
 
@@ -578,13 +615,52 @@ Not currently hardened (standard Linux defaults, acceptable for now):
   via `ps`. Avoid passing secrets as CLI arguments.
 * No disk quotas or cgroups, so one user could fill the disk or exhaust memory.
 
+Secrets
+-------
 
-External persistent storage
----------------------------
+Credentials are stored in `secrets/` (gitignored). That directory holds
+credentials that should not be in the public repo.
+
+Contents:
+
+* `redis.env`: Redis password for JuiceFS metadata engine.
+  Format: `REDIS_PASSWORD=<password>`
+  Generate:
+  ```bash
+  python3 -c "import secrets; print('REDIS_PASSWORD=' + secrets.token_urlsafe(24))" > secrets/redis.env
+  ```
+
+* `tpu-juicefs-sa-private-key.json`: GCP service account key for the
+  `tpu-juicefs@` service account, used by JuiceFS to authenticate with the GCS
+  backend. Generated in the shared storage section below. Should only be
+  needed on the current cluster due to the OAuth scopes issue; not needed when
+  we re-provision with `--scopes=cloud-platform`.
+
+These secrets are only needed on the running cluster. If the cluster is
+re-provisioned from scratch, generate fresh secrets and redeploy.
+
+Shared storage (JuiceFS)
+------------------------
+
+We use JuiceFS Community Edition to provide a shared POSIX filesystem across
+all 4 VMs. Data lives in a GCS bucket, metadata in Redis on tpu0, and each VM
+caches hot files on its local boot disk. See `issues/storage-options.md` for
+the full design rationale.
+
+Architecture:
+
+```
+tpu0 ──┐                              ┌── Redis (metadata, on tpu0)
+tpu1 ──┤── juicefs mount at /jfs ─────┤
+tpu2 ──┤   (FUSE client on each VM)   └── gs://mfrs-tpu-cluster (data, GCS)
+tpu3 ──┘
+         each VM also has a local
+         cache dir on its boot disk
+```
 
 ### Provisioning cloud storage bucket
 
-One-time set up the bucket. Storage class standard, non-public bucket.
+One-time set up a bucket. Storage class standard, non-public:
 
 ```bash
 gcloud storage buckets create gs://mfrs-tpu-cluster \
@@ -592,23 +668,126 @@ gcloud storage buckets create gs://mfrs-tpu-cluster \
   --uniform-bucket-level-access
 ```
 
+Don't need to redo this if the bucket is already created.
+
 ### Create service account for TPU VMs
 
-The TPU VMs don't have access yet. Follow the instructions
-[here](https://docs.cloud.google.com/tpu/docs/storage-buckets).
+Having created a bucket, the TPU VMs don't yet have access. Follow the
+instructions [here](https://docs.cloud.google.com/tpu/docs/storage-buckets).
 
-First create a service account.
+First, create a service account.
 
 ```bash
 gcloud beta services identity create --service tpu.googleapis.com --project ace-line-457306-p7
 # -> service-1054593878874@cloud-tpu.iam.gserviceaccount.com
 ```
 
-Authorize the service account to read from and write to the buckets:
+Then, authorize the service account to read from and write to the buckets:
 
 ```bash
 gcloud storage buckets add-iam-policy-binding gs://mfrs-tpu-cluster --member=serviceAccount:service-1054593878874@cloud-tpu.iam.gserviceaccount.com --role=roles/storage.objectViewer
 gcloud storage buckets add-iam-policy-binding gs://mfrs-tpu-cluster --member=serviceAccount:service-1054593878874@cloud-tpu.iam.gserviceaccount.com --role=roles/storage.objectCreator
+```
+
+Check via permissions tab on the gcloud console. Should only need to do this
+once for the project.
+
+These roles from the docs seem to be insufficient for file deletion. Based on
+[docs](https://docs.cloud.google.com/storage/docs/access-control/iam-roles),
+should use `storage.objectUser` probably.
+
+### Trouble: Can't add service account to TPU cluster, use key instead
+
+It seems there is no way to add this service account to the TPU after creation.
+So we're going to remember to do that next time and in the mean time, use a
+service account key as a workaround.
+
+Create a dedicated service account:
+```
+gcloud iam service-accounts create tpu-juicefs
+```
+
+Grant (only) the necessary permissions:
+```
+gcloud storage buckets add-iam-policy-binding gs://mfrs-tpu-cluster --member=serviceAccount:tpu-juicefs@ace-line-457306-p7.iam.gserviceaccount.com --role=roles/storage.objectUser
+```
+
+Make a service account key:
+```
+gcloud iam service-accounts keys create secrets/tpu-juicefs-sa-private-key.json --iam-account=tpu-juicefs@ace-line-457306-p7.iam.gserviceaccount.com
+```
+
+### Trouble: Service account key creation disabled?
+
+Docs warn that the above command should not work by default. It did seem to
+work for me. If it fails, follow the (confusing!?) instructions
+[here](https://docs.cloud.google.com/iam/docs/keys-create-delete) to create a
+tag key, attach it to the project, and make a new organisational policy based
+on this tag key that disables the service account key creation disabled
+constraint. Or, maybe just disable the constraint directly via organisation
+policies. (I couldn't figure out how to do either of these actually; but that
+is a problem for another day...)
+
+
+### Install and configure Redis (tpu0 only)
+
+Install Redis:
+
+```
+sudo apt install -y redis-server
+```
+
+Edit `/etc/redis/redis.conf` — four changes from the Ubuntu 22.04 defaults:
+
+```
+source secrets/redis.env
+# Listen on localhost and tpu0's internal IP (default: bind 127.0.0.1 ::1)
+sudo sed -i 's/^bind 127.0.0.1 ::1$/bind 127.0.0.1 10.130.0.12/' /etc/redis/redis.conf
+# Set password (default: # requirepass foobared)
+sudo sed -i "s/^# requirepass foobared$/requirepass ${REDIS_PASSWORD}/" /etc/redis/redis.conf
+# Prevent key eviction — CRITICAL, evicting a key loses a file
+# (default: # maxmemory-policy noeviction)
+sudo sed -i '/^# maxmemory-policy noeviction/a maxmemory-policy noeviction' /etc/redis/redis.conf
+# Enable append-only file for durability (default: appendonly no)
+sudo sed -i 's/^appendonly no$/appendonly yes/' /etc/redis/redis.conf
+```
+
+Enable, start, and restart (restart picks up config if Redis started before
+edits):
+
+```
+sudo systemctl enable --now redis-server
+sudo systemctl restart redis-server
+```
+
+Verify:
+
+```
+source secrets/redis.env
+redis-cli -a "$REDIS_PASSWORD" ping
+#-> Should print: PONG
+redis-cli ping
+#-> Should print: NOAUTH Authentication required.
+```
+
+### Install and configure JuiceFS (all nodes)
+
+Install JuiceFS from the official PPA:
+
+```
+for t in 0 1 2 3; do
+  echo "=== tpu$t ==="
+  ssh tpu$t 'sudo add-apt-repository -y ppa:juicefs/ppa && sudo apt-get update && sudo apt-get install -y juicefs'
+done
+```
+
+Uncomment `user_allow_other` in `/etc/fuse.conf` on all nodes (required for
+the `--allow-other` mount option, so all users can access the mount):
+
+```
+for t in 0 1 2 3; do
+  ssh tpu$t "sudo sed -i 's/^#user_allow_other$/user_allow_other/' /etc/fuse.conf"
+done
 ```
 
 TODO: Job management
