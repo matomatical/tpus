@@ -105,3 +105,4 @@ Scaling up:
 * [ ] A single reprovisioning script to set up the entire TPU cluster
 * [ ] Enable the use of pre-emptable TPU VMs
 * [ ] Learn how to make full use of the TPU VMs for a single big training run
+* [ ] Get better at using bfloat16 ([see here](https://docs.cloud.google.com/tpu/docs/bfloat16))
