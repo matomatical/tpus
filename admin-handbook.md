@@ -219,14 +219,13 @@ From local to each TPU VM:
 
 ```
 for t in 0 1 2 3; do
-  scp shared-scripts/* tpu$t:/tmp/
-  ssh tpu$t 'sudo cp /tmp/tpu-*.sh /tmp/tpu-*.py /tmp/tpups.py /home/shared/'
+  scp shared-scripts/* tpu$t:
+  ssh tpu$t 'sudo install -m 755 ~/tpu-*.sh ~/tpu-*.py ~/tpups.py /home/shared/ && rm ~/tpu-*.sh ~/tpu-*.py ~/tpups.py'
 done
 ```
 
 ```
 for t in 0 1 2 3; do
-  ssh tpu$t 'sudo chmod +x /home/shared/tpu-device.sh /home/shared/tpups.py /home/shared/tpu-usage.py /home/shared/tpu-heatmap.py /home/shared/tpu-health.py'
   ssh tpu$t 'sudo ln -sf /home/shared/tpu-device.sh /usr/local/bin/tpu-device'
   ssh tpu$t 'sudo ln -sf /home/shared/tpups.py /usr/local/bin/tpups'
   ssh tpu$t 'sudo ln -sf /home/shared/tpu-usage.py /usr/local/bin/tpu-usage'
@@ -249,8 +248,8 @@ Set up heartbeat and status web server as systemd services:
 
 ```
 for t in 0 1 2 3; do
-  scp conf/tpu-heartbeat.service conf/tpu-heartbeat-web.service tpu$t:/tmp/
-  ssh tpu$t 'sudo cp /tmp/tpu-heartbeat.service /tmp/tpu-heartbeat-web.service /etc/systemd/system/'
+  scp conf/tpu-heartbeat.service conf/tpu-heartbeat-web.service tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/tpu-heartbeat.service ~/tpu-heartbeat-web.service /etc/systemd/system/ && rm ~/tpu-heartbeat.service ~/tpu-heartbeat-web.service'
   ssh tpu$t 'sudo systemctl daemon-reload'
   ssh tpu$t 'sudo systemctl enable --now tpu-heartbeat.service tpu-heartbeat-web.service'
 done
@@ -297,10 +296,37 @@ itself) on every boot:
 
 ```
 for t in 0 1 2 3; do
-  scp conf/tpu-logs.conf tpu$t:/tmp/
-  ssh tpu$t 'sudo cp /tmp/tpu-logs.conf /etc/tmpfiles.d/tpu-logs.conf'
+  scp conf/tpu-logs.conf tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/tpu-logs.conf /etc/tmpfiles.d/tpu-logs.conf && rm ~/tpu-logs.conf'
   ssh tpu$t 'sudo systemd-tmpfiles --create'
 done
+```
+
+/tmp age-based cleanup
+----------------------
+
+The upstream `/usr/lib/tmpfiles.d/tmp.conf` only clears `/tmp` on boot. TPU
+VMs don't reboot, so `/tmp` accumulates indefinitely (stale ssh sockets,
+rotated tpu-runtime logs, old wandb artifacts, etc.). We override it with a
+14-day age so the daily `systemd-tmpfiles-clean.timer` prunes old entries.
+
+```
+for t in 0 1 2 3; do
+  scp conf/tmpfiles-tmp.conf tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/tmpfiles-tmp.conf /etc/tmpfiles.d/tmp.conf && rm ~/tmpfiles-tmp.conf'
+done
+```
+
+Our file is named `tmp.conf` at the destination to override the upstream
+file of the same name in `/usr/lib/tmpfiles.d/`. Managed subdirs like
+`.X11-unix` and `/tmp/tpu_logs/` have their own tmpfiles.d rules and are
+unaffected.
+
+To flush the existing backlog immediately rather than waiting for the next
+daily run:
+
+```
+sudo systemd-tmpfiles --clean
 ```
 
 System log size limits
@@ -326,9 +352,10 @@ limit). Install a custom logrotate config that rotates these daily and also at
 
 ```
 for t in 0 1 2 3; do
-  scp conf/logrotate-rsyslog.conf conf/logrotate-heartbeat-web.conf tpu$t:/tmp/
-  ssh tpu$t 'sudo cp /tmp/logrotate-rsyslog.conf /etc/logrotate.d/rsyslog'
-  ssh tpu$t 'sudo cp /tmp/logrotate-heartbeat-web.conf /etc/logrotate.d/heartbeat-web'
+  scp conf/logrotate-rsyslog.conf conf/logrotate-heartbeat-web.conf tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/logrotate-rsyslog.conf /etc/logrotate.d/rsyslog'
+  ssh tpu$t 'sudo install -m 644 ~/logrotate-heartbeat-web.conf /etc/logrotate.d/heartbeat-web'
+  ssh tpu$t 'rm ~/logrotate-rsyslog.conf ~/logrotate-heartbeat-web.conf'
 done
 ```
 
@@ -369,8 +396,8 @@ the container. Deploy it:
 
 ```
 for t in 0 1 2 3; do
-  scp conf/healthagent-restart.service conf/healthagent-restart.timer tpu$t:/tmp/
-  ssh tpu$t 'sudo cp /tmp/healthagent-restart.service /tmp/healthagent-restart.timer /etc/systemd/system/'
+  scp conf/healthagent-restart.service conf/healthagent-restart.timer tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/healthagent-restart.service ~/healthagent-restart.timer /etc/systemd/system/ && rm ~/healthagent-restart.service ~/healthagent-restart.timer'
   ssh tpu$t 'sudo systemctl daemon-reload'
   ssh tpu$t 'sudo systemctl enable --now healthagent-restart.timer'
 done
@@ -389,10 +416,11 @@ Deploy cluster hostnames to `/etc/hosts` and the SSH config:
 
 ```
 for t in 0 1 2 3; do
-  scp conf/cluster-hosts conf/cluster-ssh.conf tpu$t:/tmp/;
-  ssh tpu$t 'cat /tmp/cluster-hosts | sudo tee -a /etc/hosts > /dev/null';
+  scp conf/cluster-hosts conf/cluster-ssh.conf tpu$t:;
+  ssh tpu$t 'cat ~/cluster-hosts | sudo tee -a /etc/hosts > /dev/null';
   ssh tpu$t 'sudo mkdir -p /etc/ssh/ssh_config.d';
-  ssh tpu$t 'sudo cp /tmp/cluster-ssh.conf /etc/ssh/ssh_config.d/cluster-ssh.conf';
+  ssh tpu$t 'sudo install -m 644 ~/cluster-ssh.conf /etc/ssh/ssh_config.d/cluster-ssh.conf';
+  ssh tpu$t 'rm ~/cluster-hosts ~/cluster-ssh.conf';
 done
 ```
 
@@ -446,8 +474,8 @@ Deploy the config to each VM:
 
 ```
 for t in 0 1 2 3; do
-  scp conf/tpu-defaults.sh tpu$t:/tmp/
-  ssh tpu$t 'sudo cp /tmp/tpu-defaults.sh /etc/profile.d/tpu-defaults.sh'
+  scp conf/tpu-defaults.sh tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/tpu-defaults.sh /etc/profile.d/tpu-defaults.sh && rm ~/tpu-defaults.sh'
 done
 ```
 
@@ -457,6 +485,12 @@ These are already included in `home-stuff/zshrc.zshrc`.
 
 Users can still use `tpu-device` to override these defaults and target specific
 devices or multiple devices.
+
+Note: a plain `ssh tpuN 'cmd'` runs a non-interactive non-login shell, which
+sources neither `/etc/profile.d/` nor `~/.zshrc`. So `ssh tpuN 'env | grep TPU_'`
+will show nothing — on *all* VMs, not just one. To pick up the defaults across
+SSH, force a login/interactive shell, e.g. `ssh tpuN 'bash -lc "cmd"'` or
+`ssh tpuN 'zsh -ic "cmd"'`.
 
 Making myself at home
 ---------------------
@@ -531,30 +565,28 @@ done
 
 ### Installing LaTeX
 
-LaTeX has various distributions with various sizes, I went for something short
-of the full set
+LaTeX has various distributions with various sizes
   (see [here](https://tex.stackexchange.com/questions/245982/differences-between-texlive-packages-in-linux#answer-504566)
   for notes on different options).
+While we are a bit short on space, that should hopefully clear up soon based on
+the JuiceFS project, and I kept running into missing packages, fonts, and tools
+even with `texlive-latex-extra`. So I'm installing the full `texlive-full`:
 
 ```
 for t in 0 1 2 3; do
-  ssh tpu$t 'sudo apt install -y texlive-latex-extra latexmk'
+  ssh tpu$t 'sudo apt install -y texlive-full'
 done
 ```
 
-Ideally could use tectonic but that does not have an official distribution via
-apt, only snap, and I seem to dislike snap? Could install manually or compile
-it from source if I installed rust. Ah---it is also on brew.
+TODO: Confirm this comes with `latexmk cm-super dvipng`, previously installed
+manually.
 
-Some extra packages for rendering plots:
+Ideally could use tectonic, but students may find that confusing. For space
+reasons, I don't want to install both. Note tectonic is not available via apt,
+only snap and brew, which adds complexity. Could install manually following
+their instructions.
 
-```
-for t in 0 1 2 3; do
-  ssh tpu$t 'sudo apt install -y cm-super dvipng'
-done
-```
-
-### Installing NodeJS / apps
+### Installing NodeJS / node apps
 
 Node available from apt is ridiculously old. I went with nvm. This means it's a
 local install and I only did it on tpu0 so far.
@@ -789,6 +821,20 @@ for t in 0 1 2 3; do
   ssh tpu$t "sudo sed -i 's/^#user_allow_other$/user_allow_other/' /etc/fuse.conf"
 done
 ```
+
+### Install redis-tools on client nodes (tpu1, tpu2, tpu3)
+
+Install `redis-tools` on the JuiceFS client nodes so we can run diagnostics
+(e.g. `redis-cli -h tpu0 --latency`) from each VM. tpu0 already has it via
+`redis-server`, so only the other nodes need this:
+
+```
+for t in 1 2 3; do
+  ssh tpu$t 'sudo apt-get install -y redis-tools'
+done
+```
+
+Currently installed on: tpu1, tpu2, tpu3.
 
 TODO: Job management
 --------------------

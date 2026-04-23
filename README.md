@@ -75,6 +75,11 @@ April 2026, backend stability improvements:
 * [x] `fetch-logs.sh` admin script for backing up heartbeat history.
 * [x] Streamlined admin handbook.
 * [x] tpu-heartbeat-web: log to tmpfs to avoid ext4 journal contention
+* [x] Project CLAUDE.md with repo layout, deployment pattern, and security
+  pointers.
+* [x] Deploy configs via `~/` staging instead of `/tmp/` (closes a symlink
+  TOCTOU race)
+* [x] Configure automatic 14-day `/tmp` age-based cleanup.
 
 Major feature: Persistent shared storage
 
