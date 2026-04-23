@@ -287,11 +287,24 @@ The community edition lacks per-user quotas and a management UI (enterprise
 features), but these aren't priorities for us.
 
 
+### Benchmark outcome (2026-04-23)
+
+Benchmarks on all 4 nodes confirmed this design: warm-cache ops are
+near local-disk speed, remote-Redis metadata is ~1.5–2× slower than
+localhost but still comfortable in absolute terms, and 4-node
+concurrent load shows only ~5–10% per-node slowdown — Redis is nowhere
+near saturation. Full results in
+[`juicefs-benchmark-results.md`](juicefs-benchmark-results.md).
+
+Mount path decision: **`/storage`** for production, `/jfs` was used
+for benchmarking and can be retired once we switch over.
+
+
 ### Architecture
 
 ```
 tpu0 ──┐                              ┌── Redis (metadata, on tpu0)
-tpu1 ──┤── juicefs mount at /jfs ─────┤
+tpu1 ──┤── juicefs mount at /storage ─┤
 tpu2 ──┤   (FUSE client on each VM)   └── GCS bucket (data)
 tpu3 ──┘
          each VM also has a local
@@ -399,16 +412,18 @@ Create symlink for mount helper:
 sudo ln -s /usr/local/bin/juicefs /sbin/mount.juicefs
 ```
 
-Create `/etc/systemd/system/jfs.mount`:
+Create `/etc/systemd/system/storage.mount` (systemd derives the unit
+name from the mount point, so a different mount point needs a different
+unit filename):
 ```ini
 [Unit]
 Description=JuiceFS cluster storage
+Requires=network-online.target
 After=network-online.target
-Wants=network-online.target
 
 [Mount]
 What=redis://:PASSWORD@tpu0:6379/0
-Where=/jfs
+Where=/storage
 Type=juicefs
 Options=_netdev,allow-other,cache-dir=/var/jfsCache,cache-size=40960,buffer-size=600,writeback,upload-delay=1m
 
@@ -421,30 +436,34 @@ Note: for tpu0, add `After=redis-server.service` to the unit.
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable --now jfs.mount
+sudo systemctl enable --now storage.mount
 ```
 
 #### User setup
 
 IMPORTANT: If Redis goes down, the JuiceFS mount freezes and any SSH login
-that tries to access a path on `/jfs/` will hang — same failure mode as the
-old NFS setup. The admin account (`matt`) MUST keep its home directory on
-the local boot disk (`/home/matt`) to ensure recovery access.
+that tries to access a path on `/storage/` will hang — same failure mode
+as the old NFS setup. The admin account (`matt`) MUST keep its home
+directory on the local boot disk (`/home/matt`) to ensure recovery
+access.
 
 User home directory strategy: **JuiceFS as actual home**. Use
-`usermod -d /jfs/home/<user>` so user home directories live on JuiceFS.
-Dotfiles, SSH keys, shell config — everything is shared automatically
-across all VMs. If Redis goes down, non-admin users can't SSH in, but
-they can't do useful work on a cluster with frozen storage anyway.
+`usermod -d /storage/home/<user>` so user home directories live on
+JuiceFS. Dotfiles, SSH keys, shell config — everything is shared
+automatically across all VMs. As a bonus, with the uv cache under
+`~/.cache/uv`, it lives on the same filesystem as the venv, so
+`uv pip install` can hardlink (the benchmark's 10s scipy slowdown went
+away in this arrangement). If Redis goes down, non-admin users can't SSH
+in, but they can't do useful work on a cluster with frozen storage
+anyway.
 
-For all options, create per-user directories on JuiceFS:
+Create per-user directories on JuiceFS:
 ```bash
-sudo mkdir -p /jfs/home
+sudo mkdir -p /storage/home
 # For each user:
-sudo mkdir /jfs/home/<username>
-sudo chown <username>:<username> /jfs/home/<username>
+sudo mkdir /storage/home/<username>
+sudo chown <username>:<username> /storage/home/<username>
 ```
-
 
 ### Benchmarking plan
 
@@ -560,13 +579,13 @@ wait
 
 ```bash
 # Quick check: real-time stats (cache hits, metadata latency, GCS ops)
-juicefs stats /jfs
+juicefs stats /storage
 
 # Check connected clients and filesystem info
 juicefs status redis://:${REDIS_PASSWORD}@tpu0:6379/0
 
 # Check fragmentation on a specific file
-juicefs info /jfs/path/to/file
+juicefs info /storage/path/to/file
 
 # Redis memory usage
 redis-cli -a <password> INFO memory | grep used_memory_human
@@ -630,15 +649,26 @@ The critical risk is Redis data loss. Mitigations:
 
 ### Migration plan
 
-1. Install and format (all nodes).
-2. Run benchmarks, validate acceptable performance.
-3. Mount at `/jfs` via systemd on all nodes.
-4. Create `/jfs/home/<user>` directories.
-5. Migrate user data to `/jfs/home/<user>/`.
-6. Update user home directories: `sudo usermod -d /jfs/home/<user> <user>`.
+1. **[done]** Install and format (all nodes).
+2. **[done]** Run benchmarks, validate acceptable performance. See
+   [`juicefs-benchmark-results.md`](juicefs-benchmark-results.md).
+3. **[next]** Mount at `/storage` via systemd on all nodes. Currently
+   only a manual `/jfs` mount is running on all 4 nodes from the
+   benchmark phase; to switch, unmount `/jfs` and bring up the
+   `storage.mount` unit instead. (Both mounts hit the same Redis +
+   GCS backend so data is identical — this is a mount-point rename,
+   not a migration.)
+4. Create `/storage/home/<user>` directories.
+5. Migrate user data to `/storage/home/<user>/`.
+6. Update user home directories:
+   `sudo usermod -d /storage/home/<user> <user>`.
    (Admin account `matt` stays at `/home/matt` for recovery access.)
 7. Set up monitoring crons on tpu0.
-8. Run `juicefs warmup` on migrated venvs.
+8. Warm up each node's cache after mount: `juicefs warmup` on migrated
+   venvs. The benchmark showed cold imports take 30+ seconds for JAX and
+   5+ minutes for PyTorch/XLA, so ideally automate this via a
+   `juicefs-warmup.service` oneshot that runs after `storage.mount` on
+   each boot. Targets: any `venv/` directory under `/storage/home/`.
 9. Observe for a week before considering any changes to boot disk usage.
 
 ### Cost estimate
@@ -710,10 +740,12 @@ small test transfer.
 * **Hybrid checkpointing**: Not needed initially. If models grow past a few
   GB, write checkpoints directly to `gs://` via JAX/Orbax to avoid cache
   thrashing. Revisit later.
+* **Mount path**: `/storage` for production. `/jfs` was used for the
+  benchmark mounts (same Redis + GCS backend, just a different mount
+  point) and will be retired once `storage.mount` is live.
 
 ### Open questions
 
-* What mount path? `/jfs` is simple. Decide during setup.
 * **`juicefs gc --delete`**: Run manually the first few times before putting
   it in a cron job, to verify it's not deleting anything unexpected. Running
   `juicefs gc` without `--delete` is already a check-only scan (there is no

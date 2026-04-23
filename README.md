@@ -78,11 +78,12 @@ April 2026, backend stability improvements:
 
 Major feature: Persistent shared storage
 
-* [x] Consider various options (see issues/storage-options.md)
+* [x] Consider various options (see issues/storage/storage-options.md)
   -> try JuiceFS + GCS
 * [x] Research deployment rollout plan, cost estimates etc.
 * [x] Create bucket, install and configure JuiceFS
-* [ ] Run benchmarks and validate acceptable performance
+* [x] Run benchmarks and validate acceptable performance
+  (see issues/storage/juicefs-benchmark-results.md)
 * [ ] Mount and port user home directories
 * [ ] Set up monitoring of health, cache size, and cost
 
