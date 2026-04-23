@@ -405,6 +405,28 @@ done
 
 See `issues/healthagent-oom/` for a detailed bug report.
 
+### Trouble: rsyslog `/dev/console` spam
+
+The GCP-default `/etc/rsyslog.d/90-google.conf` routes `daemon,kern.*`
+messages to `/dev/console` for boot-time crash diagnostics. rsyslog runs
+as user `syslog`, which is not in the `tty` group, so it can't open
+`/dev/console` (mode 0620, `root:tty`). Every matching message trips the
+omfile action, flooding journald with `action-8-builtin:omfile suspended`
+lines at thousands per hour per VM. Disable the rule by deploying a
+commented-out replacement:
+
+```
+for t in 0 1 2 3; do
+  scp conf/rsyslog-90-google.conf tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/rsyslog-90-google.conf /etc/rsyslog.d/90-google.conf && rm ~/rsyslog-90-google.conf'
+  ssh tpu$t 'sudo systemctl restart rsyslog'
+done
+```
+
+The daemon/kern messages still reach the usual `/var/log/*` and journal
+destinations via other rsyslog rules; we're only dropping the console
+fan-out, which was never working anyway.
+
 Configuring intra-cluster SSH
 -----------------------------
 

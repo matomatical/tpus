@@ -80,6 +80,7 @@ April 2026, backend stability improvements:
 * [x] Deploy configs via `~/` staging instead of `/tmp/` (closes a symlink
   TOCTOU race)
 * [x] Configure automatic 14-day `/tmp` age-based cleanup.
+* [x] Silence `rsyslog` `/dev/console` omfile suspension spam.
 
 Major feature: Persistent shared storage
 
