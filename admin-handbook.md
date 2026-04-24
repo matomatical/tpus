@@ -677,18 +677,32 @@ credentials that should not be in the public repo.
 
 Contents:
 
-* `redis.env`: Redis password for JuiceFS metadata engine.
-  Format: `REDIS_PASSWORD=<password>`
+* `redis.env`: Redis password for JuiceFS metadata engine. Two variable
+  names with the same value — `REDIS_PASSWORD` is sourced by admin scripts
+  (e.g. `redis-cli -a "$REDIS_PASSWORD"`), `META_PASSWORD` is the
+  juicefs-native env var loaded by `storage.mount` via `EnvironmentFile=`.
+  ```
+  REDIS_PASSWORD=<password>
+  META_PASSWORD=<password>
+  ```
   Generate:
   ```bash
-  python3 -c "import secrets; print('REDIS_PASSWORD=' + secrets.token_urlsafe(24))" > secrets/redis.env
+  python3 -c "import secrets; pw = secrets.token_urlsafe(24); print(f'REDIS_PASSWORD={pw}\nMETA_PASSWORD={pw}')" > secrets/redis.env
   ```
+  Deployed to `/etc/juicefs/redis.env` (mode `0600 root:root`) on each
+  node by the Mount JuiceFS section. **Do not put this password in the
+  unit's `What=` URL** — systemd stores the full mount argv in its
+  runtime state, which is readable by any user via `systemctl show -p
+  ExecMount` regardless of the unit file's mode.
 
 * `tpu-juicefs-sa-private-key.json`: GCP service account key for the
-  `tpu-juicefs@` service account, used by JuiceFS to authenticate with the GCS
-  backend. Generated in the shared storage section below. Should only be
-  needed on the current cluster due to the OAuth scopes issue; not needed when
-  we re-provision with `--scopes=cloud-platform`.
+  `tpu-juicefs@` service account, used by JuiceFS to authenticate with the
+  GCS backend. Generated in the shared storage section below. Deployed to
+  `/etc/juicefs/sa-private-key.json` (mode `0600 root:root`) on each node.
+  The unit points at it via
+  `Environment=GOOGLE_APPLICATION_CREDENTIALS=...`. Should only be needed
+  on the current cluster due to the OAuth scopes issue; not needed when we
+  re-provision with `--scopes=cloud-platform`.
 
 These secrets are only needed on the running cluster. If the cluster is
 re-provisioned from scratch, generate fresh secrets and redeploy.
@@ -958,12 +972,20 @@ this becomes `admin-scripts/migrate-home.sh`.
   done
   ```
 - If UIDs drift, renumber on the mismatched node with `usermod -u NEW`
-  and `groupmod -g NEW`. `usermod -u` auto-chowns files inside the home
-  directory; `groupmod -g` does **not** — run `sudo chgrp -R USERNAME
-  /home/USERNAME` after renumber, and scan for orphans outside the home
-  with `sudo find / -xdev \( -nouser -o -nogroup \) -print` (check
-  `/tmp`, `/var/spool/cron`, `/var/mail` etc.). Delete or chown as
-  appropriate.
+  and `groupmod -g NEW`. `usermod -u -g NEW_PRIMARY` auto-chowns files
+  inside the user's home directory (both UID and primary GID) if you
+  pass `-g`; `groupmod -g` alone does **not** walk the filesystem.
+  After renumber: `sudo chgrp -R USERNAME /home/USERNAME` to be safe,
+  and scan for orphans outside the home with
+  `sudo find / -xdev \( -nouser -o -nogroup \) -print` (check `/tmp`,
+  `/var/spool/cron`, `/var/mail` etc.).
+- `find -nogroup` only catches files whose current GID is **unassigned**.
+  If a renumber reassigned the old GID to a *different* user, files with
+  that GID silently appear owned by the wrong group — `find` will not
+  flag them. So chgrp-the-home is mandatory, not just a belt-and-braces
+  step. For each renumbered user, verify with
+  `sudo find /home/USERNAME -not \( -user USERNAME -group USERNAME \) -printf "%u:%g %p\n"`
+  and expect no output.
 
 **One-time cluster setup (only needed before the first migration):**
 
