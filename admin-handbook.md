@@ -96,6 +96,12 @@ console settings, maybe because it is a service agent. Will it work via gcloud?
 Or can we use the default service account and attach the permissions to that?
 We can figure this out next time we provision.
 
+TODO: We will also have to figure out how to restrict access to the service
+account to only root users. We don't want non-root users to be able to read the
+contents of the GCS bucket as it ultimately contains sensitive data from each
+user. Maybe using a service account key, as in the workaround below, is
+actually easier here.
+
 SSH config
 ----------
 
