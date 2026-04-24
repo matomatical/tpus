@@ -569,28 +569,70 @@ will need to figure out the appropriate combination of environment variables
 and override the defaults, which stop the TPUs from trying to talk to
 each-other.
 
-Customising your shell and tools
---------------------------------
+Customising your shell
+----------------------
 
-If you have preferences for your shell (zsh, etc.), editor (vim, etc.), or
-other dotfiles, you are free to set them up. Just remember that each VM is
-independent — you'll need to configure each one, or copy your dotfiles across.
-For example, from tpu0:
+The default login shell is bash. You can switch to another installed shell if
+you prefer. Custom shells installed:
 
+* Zsh
+
+Usually, to switch your login shell, you need sudo access or your password.
+Both are disabled on this cluster. To change your shell (e.g. to zsh), I
+recommend a user-space method. Namely, replace the default contents of your
+.bashrc with something like this:
+
+```bash
+if [[ $- == *i* ]]; then
+    # if this is an interactive session
+    if command -v zsh >/dev/null 2>&1; then
+        # if zsh is found, transform login shell into zsh
+        export SHELL=$(command -v zsh)
+        exec zsh -l
+    else
+        echo "Warning: zsh not found. Falling back to bash." >&2
+    fi
+fi
 ```
-for t in 1 2 3; do scp ~/.zshrc tpu$t:; done
-```
 
-Note that if you switch from bash to another shell (e.g. zsh) you might not get
-the default environment variables. You should therefore add something like the
-following to your profile:
+This method has the following benefits:
 
-```
+* As far as the user account system is concerned, your login shell is still
+  bash; so you don't need root or a password to change that.
+* Since your login shell is still bash, you pick up the default environment
+  variables configured for bash before switching to zsh.
+* This method technically also allows you to run any shell binary you have
+  installed locally, so you don't even need my help to install a new shell.
+
+If you want me to switch your actual login shell or install a new shell, I'm
+still happy to do that. You can add the environment variables to your profile
+yourself with something like this.
+
+```bash
 export TPU_CHIPS_PER_PROCESS_BOUNDS=1,1,1
 export TPU_PROCESS_BOUNDS=1,1,1
 export TPU_VISIBLE_DEVICES=0
 export PJRT_DEVICE=TPU
 ```
+
+Customising other tools
+-----------------------
+
+Most other changes are easier, make yourself at home via dotfiles like you
+normally would. You can set up your path, default editor, etc., in your
+profile. If you want me to install some missing standard software, just ask.
+
+Installed already:
+
+* nvim
+* latex (texlive-full)
+* latexmk
+* ffmpeg
+* pandoc
+* entr
+
+For python and nodejs I recommend managing your own virtual environments in
+user-space with `uv` and `nvm` respectively.
 
 Graduating to your own cluster
 ------------------------------

@@ -75,15 +75,23 @@ April 2026, backend stability improvements:
 * [x] `fetch-logs.sh` admin script for backing up heartbeat history.
 * [x] Streamlined admin handbook.
 * [x] tpu-heartbeat-web: log to tmpfs to avoid ext4 journal contention
+* [x] Project CLAUDE.md with repo layout, deployment pattern, and security
+  pointers.
+* [x] Deploy configs via `~/` staging instead of `/tmp/` (closes a symlink
+  TOCTOU race)
+* [x] Configure automatic 14-day `/tmp` age-based cleanup.
+* [x] Silence `rsyslog` `/dev/console` omfile suspension spam.
 
 Major feature: Persistent shared storage
 
-* [x] Consider various options (see issues/storage-options.md)
+* [x] Consider various options (see issues/storage/storage-options.md)
   -> try JuiceFS + GCS
 * [x] Research deployment rollout plan, cost estimates etc.
 * [x] Create bucket, install and configure JuiceFS
-* [ ] Run benchmarks and validate acceptable performance
-* [ ] Mount and port user home directories
+* [x] Run benchmarks and validate acceptable performance
+  (see issues/storage/juicefs-benchmark-results.md)
+* [x] Mount `/storage` via systemd on all 4 nodes.
+* [ ] Port user home directories to `/storage/home/`.
 * [ ] Set up monitoring of health, cache size, and cost
 
 Major feature: TPU queueing system (prerequisite, persistent shared storage)
@@ -105,3 +113,4 @@ Scaling up:
 * [ ] A single reprovisioning script to set up the entire TPU cluster
 * [ ] Enable the use of pre-emptable TPU VMs
 * [ ] Learn how to make full use of the TPU VMs for a single big training run
+* [ ] Get better at using bfloat16 ([see here](https://docs.cloud.google.com/tpu/docs/bfloat16))

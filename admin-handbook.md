@@ -225,14 +225,13 @@ From local to each TPU VM:
 
 ```
 for t in 0 1 2 3; do
-  scp shared-scripts/* tpu$t:/tmp/
-  ssh tpu$t 'sudo cp /tmp/tpu-*.sh /tmp/tpu-*.py /tmp/tpups.py /home/shared/'
+  scp shared-scripts/* tpu$t:
+  ssh tpu$t 'sudo install -m 755 ~/tpu-*.sh ~/tpu-*.py ~/tpups.py /home/shared/ && rm ~/tpu-*.sh ~/tpu-*.py ~/tpups.py'
 done
 ```
 
 ```
 for t in 0 1 2 3; do
-  ssh tpu$t 'sudo chmod +x /home/shared/tpu-device.sh /home/shared/tpups.py /home/shared/tpu-usage.py /home/shared/tpu-heatmap.py /home/shared/tpu-health.py'
   ssh tpu$t 'sudo ln -sf /home/shared/tpu-device.sh /usr/local/bin/tpu-device'
   ssh tpu$t 'sudo ln -sf /home/shared/tpups.py /usr/local/bin/tpups'
   ssh tpu$t 'sudo ln -sf /home/shared/tpu-usage.py /usr/local/bin/tpu-usage'
@@ -255,8 +254,8 @@ Set up heartbeat and status web server as systemd services:
 
 ```
 for t in 0 1 2 3; do
-  scp conf/tpu-heartbeat.service conf/tpu-heartbeat-web.service tpu$t:/tmp/
-  ssh tpu$t 'sudo cp /tmp/tpu-heartbeat.service /tmp/tpu-heartbeat-web.service /etc/systemd/system/'
+  scp conf/tpu-heartbeat.service conf/tpu-heartbeat-web.service tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/tpu-heartbeat.service ~/tpu-heartbeat-web.service /etc/systemd/system/ && rm ~/tpu-heartbeat.service ~/tpu-heartbeat-web.service'
   ssh tpu$t 'sudo systemctl daemon-reload'
   ssh tpu$t 'sudo systemctl enable --now tpu-heartbeat.service tpu-heartbeat-web.service'
 done
@@ -303,10 +302,37 @@ itself) on every boot:
 
 ```
 for t in 0 1 2 3; do
-  scp conf/tpu-logs.conf tpu$t:/tmp/
-  ssh tpu$t 'sudo cp /tmp/tpu-logs.conf /etc/tmpfiles.d/tpu-logs.conf'
+  scp conf/tpu-logs.conf tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/tpu-logs.conf /etc/tmpfiles.d/tpu-logs.conf && rm ~/tpu-logs.conf'
   ssh tpu$t 'sudo systemd-tmpfiles --create'
 done
+```
+
+/tmp age-based cleanup
+----------------------
+
+The upstream `/usr/lib/tmpfiles.d/tmp.conf` only clears `/tmp` on boot. TPU
+VMs don't reboot, so `/tmp` accumulates indefinitely (stale ssh sockets,
+rotated tpu-runtime logs, old wandb artifacts, etc.). We override it with a
+14-day age so the daily `systemd-tmpfiles-clean.timer` prunes old entries.
+
+```
+for t in 0 1 2 3; do
+  scp conf/tmpfiles-tmp.conf tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/tmpfiles-tmp.conf /etc/tmpfiles.d/tmp.conf && rm ~/tmpfiles-tmp.conf'
+done
+```
+
+Our file is named `tmp.conf` at the destination to override the upstream
+file of the same name in `/usr/lib/tmpfiles.d/`. Managed subdirs like
+`.X11-unix` and `/tmp/tpu_logs/` have their own tmpfiles.d rules and are
+unaffected.
+
+To flush the existing backlog immediately rather than waiting for the next
+daily run:
+
+```
+sudo systemd-tmpfiles --clean
 ```
 
 System log size limits
@@ -332,9 +358,10 @@ limit). Install a custom logrotate config that rotates these daily and also at
 
 ```
 for t in 0 1 2 3; do
-  scp conf/logrotate-rsyslog.conf conf/logrotate-heartbeat-web.conf tpu$t:/tmp/
-  ssh tpu$t 'sudo cp /tmp/logrotate-rsyslog.conf /etc/logrotate.d/rsyslog'
-  ssh tpu$t 'sudo cp /tmp/logrotate-heartbeat-web.conf /etc/logrotate.d/heartbeat-web'
+  scp conf/logrotate-rsyslog.conf conf/logrotate-heartbeat-web.conf tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/logrotate-rsyslog.conf /etc/logrotate.d/rsyslog'
+  ssh tpu$t 'sudo install -m 644 ~/logrotate-heartbeat-web.conf /etc/logrotate.d/heartbeat-web'
+  ssh tpu$t 'rm ~/logrotate-rsyslog.conf ~/logrotate-heartbeat-web.conf'
 done
 ```
 
@@ -375,14 +402,36 @@ the container. Deploy it:
 
 ```
 for t in 0 1 2 3; do
-  scp conf/healthagent-restart.service conf/healthagent-restart.timer tpu$t:/tmp/
-  ssh tpu$t 'sudo cp /tmp/healthagent-restart.service /tmp/healthagent-restart.timer /etc/systemd/system/'
+  scp conf/healthagent-restart.service conf/healthagent-restart.timer tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/healthagent-restart.service ~/healthagent-restart.timer /etc/systemd/system/ && rm ~/healthagent-restart.service ~/healthagent-restart.timer'
   ssh tpu$t 'sudo systemctl daemon-reload'
   ssh tpu$t 'sudo systemctl enable --now healthagent-restart.timer'
 done
 ```
 
 See `issues/healthagent-oom/` for a detailed bug report.
+
+### Trouble: rsyslog `/dev/console` spam
+
+The GCP-default `/etc/rsyslog.d/90-google.conf` routes `daemon,kern.*`
+messages to `/dev/console` for boot-time crash diagnostics. rsyslog runs
+as user `syslog`, which is not in the `tty` group, so it can't open
+`/dev/console` (mode 0620, `root:tty`). Every matching message trips the
+omfile action, flooding journald with `action-8-builtin:omfile suspended`
+lines at thousands per hour per VM. Disable the rule by deploying a
+commented-out replacement:
+
+```
+for t in 0 1 2 3; do
+  scp conf/rsyslog-90-google.conf tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/rsyslog-90-google.conf /etc/rsyslog.d/90-google.conf && rm ~/rsyslog-90-google.conf'
+  ssh tpu$t 'sudo systemctl restart rsyslog'
+done
+```
+
+The daemon/kern messages still reach the usual `/var/log/*` and journal
+destinations via other rsyslog rules; we're only dropping the console
+fan-out, which was never working anyway.
 
 Configuring intra-cluster SSH
 -----------------------------
@@ -395,10 +444,11 @@ Deploy cluster hostnames to `/etc/hosts` and the SSH config:
 
 ```
 for t in 0 1 2 3; do
-  scp conf/cluster-hosts conf/cluster-ssh.conf tpu$t:/tmp/;
-  ssh tpu$t 'cat /tmp/cluster-hosts | sudo tee -a /etc/hosts > /dev/null';
+  scp conf/cluster-hosts conf/cluster-ssh.conf tpu$t:;
+  ssh tpu$t 'cat ~/cluster-hosts | sudo tee -a /etc/hosts > /dev/null';
   ssh tpu$t 'sudo mkdir -p /etc/ssh/ssh_config.d';
-  ssh tpu$t 'sudo cp /tmp/cluster-ssh.conf /etc/ssh/ssh_config.d/cluster-ssh.conf';
+  ssh tpu$t 'sudo install -m 644 ~/cluster-ssh.conf /etc/ssh/ssh_config.d/cluster-ssh.conf';
+  ssh tpu$t 'rm ~/cluster-hosts ~/cluster-ssh.conf';
 done
 ```
 
@@ -452,8 +502,8 @@ Deploy the config to each VM:
 
 ```
 for t in 0 1 2 3; do
-  scp conf/tpu-defaults.sh tpu$t:/tmp/
-  ssh tpu$t 'sudo cp /tmp/tpu-defaults.sh /etc/profile.d/tpu-defaults.sh'
+  scp conf/tpu-defaults.sh tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/tpu-defaults.sh /etc/profile.d/tpu-defaults.sh && rm ~/tpu-defaults.sh'
 done
 ```
 
@@ -463,6 +513,12 @@ These are already included in `home-stuff/zshrc.zshrc`.
 
 Users can still use `tpu-device` to override these defaults and target specific
 devices or multiple devices.
+
+Note: a plain `ssh tpuN 'cmd'` runs a non-interactive non-login shell, which
+sources neither `/etc/profile.d/` nor `~/.zshrc`. So `ssh tpuN 'env | grep TPU_'`
+will show nothing — on *all* VMs, not just one. To pick up the defaults across
+SSH, force a login/interactive shell, e.g. `ssh tpuN 'bash -lc "cmd"'` or
+`ssh tpuN 'zsh -ic "cmd"'`.
 
 Making myself at home
 ---------------------
@@ -537,30 +593,28 @@ done
 
 ### Installing LaTeX
 
-LaTeX has various distributions with various sizes, I went for something short
-of the full set
+LaTeX has various distributions with various sizes
   (see [here](https://tex.stackexchange.com/questions/245982/differences-between-texlive-packages-in-linux#answer-504566)
   for notes on different options).
+While we are a bit short on space, that should hopefully clear up soon based on
+the JuiceFS project, and I kept running into missing packages, fonts, and tools
+even with `texlive-latex-extra`. So I'm installing the full `texlive-full`:
 
 ```
 for t in 0 1 2 3; do
-  ssh tpu$t 'sudo apt install -y texlive-latex-extra latexmk'
+  ssh tpu$t 'sudo apt install -y texlive-full'
 done
 ```
 
-Ideally could use tectonic but that does not have an official distribution via
-apt, only snap, and I seem to dislike snap? Could install manually or compile
-it from source if I installed rust. Ah---it is also on brew.
+TODO: Confirm this comes with `latexmk cm-super dvipng`, previously installed
+manually.
 
-Some extra packages for rendering plots:
+Ideally could use tectonic, but students may find that confusing. For space
+reasons, I don't want to install both. Note tectonic is not available via apt,
+only snap and brew, which adds complexity. Could install manually following
+their instructions.
 
-```
-for t in 0 1 2 3; do
-  ssh tpu$t 'sudo apt install -y cm-super dvipng'
-done
-```
-
-### Installing NodeJS / apps
+### Installing NodeJS / node apps
 
 Node available from apt is ridiculously old. I went with nvm. This means it's a
 local install and I only did it on tpu0 so far.
@@ -629,18 +683,32 @@ credentials that should not be in the public repo.
 
 Contents:
 
-* `redis.env`: Redis password for JuiceFS metadata engine.
-  Format: `REDIS_PASSWORD=<password>`
+* `redis.env`: Redis password for JuiceFS metadata engine. Two variable
+  names with the same value — `REDIS_PASSWORD` is sourced by admin scripts
+  (e.g. `redis-cli -a "$REDIS_PASSWORD"`), `META_PASSWORD` is the
+  juicefs-native env var loaded by `storage.mount` via `EnvironmentFile=`.
+  ```
+  REDIS_PASSWORD=<password>
+  META_PASSWORD=<password>
+  ```
   Generate:
   ```bash
-  python3 -c "import secrets; print('REDIS_PASSWORD=' + secrets.token_urlsafe(24))" > secrets/redis.env
+  python3 -c "import secrets; pw = secrets.token_urlsafe(24); print(f'REDIS_PASSWORD={pw}\nMETA_PASSWORD={pw}')" > secrets/redis.env
   ```
+  Deployed to `/etc/juicefs/redis.env` (mode `0600 root:root`) on each
+  node by the Mount JuiceFS section. **Do not put this password in the
+  unit's `What=` URL** — systemd stores the full mount argv in its
+  runtime state, which is readable by any user via `systemctl show -p
+  ExecMount` regardless of the unit file's mode.
 
 * `tpu-juicefs-sa-private-key.json`: GCP service account key for the
-  `tpu-juicefs@` service account, used by JuiceFS to authenticate with the GCS
-  backend. Generated in the shared storage section below. Should only be
-  needed on the current cluster due to the OAuth scopes issue; not needed when
-  we re-provision with `--scopes=cloud-platform`.
+  `tpu-juicefs@` service account, used by JuiceFS to authenticate with the
+  GCS backend. Generated in the shared storage section below. Deployed to
+  `/etc/juicefs/sa-private-key.json` (mode `0600 root:root`) on each node.
+  The unit points at it via
+  `Environment=GOOGLE_APPLICATION_CREDENTIALS=...`. Should only be needed
+  on the current cluster due to the OAuth scopes issue; not needed when we
+  re-provision with `--scopes=cloud-platform`.
 
 These secrets are only needed on the running cluster. If the cluster is
 re-provisioned from scratch, generate fresh secrets and redeploy.
@@ -656,9 +724,9 @@ the full design rationale.
 Architecture:
 
 ```
-tpu0 ──┐                              ┌── Redis (metadata, on tpu0)
-tpu1 ──┤── juicefs mount at /jfs ─────┤
-tpu2 ──┤   (FUSE client on each VM)   └── gs://mfrs-tpu-cluster (data, GCS)
+tpu0 ──┐                                  ┌── Redis (metadata, on tpu0)
+tpu1 ──┤── juicefs mount at /storage ─────┤
+tpu2 ──┤   (FUSE client on each VM)       └── gs://mfrs-tpu-cluster (data, GCS)
 tpu3 ──┘
          each VM also has a local
          cache dir on its boot disk
@@ -795,6 +863,188 @@ for t in 0 1 2 3; do
   ssh tpu$t "sudo sed -i 's/^#user_allow_other$/user_allow_other/' /etc/fuse.conf"
 done
 ```
+
+### Install redis-tools on client nodes (tpu1, tpu2, tpu3)
+
+Install `redis-tools` on the JuiceFS client nodes so we can run diagnostics
+(e.g. `redis-cli -h tpu0 --latency`) from each VM. tpu0 already has it via
+`redis-server`, so only the other nodes need this:
+
+```
+for t in 1 2 3; do
+  ssh tpu$t 'sudo apt-get install -y redis-tools'
+done
+```
+
+Currently installed on: tpu1, tpu2, tpu3.
+
+### Mount JuiceFS at `/storage` (all nodes)
+
+The cluster filesystem is mounted at `/storage` via a systemd `.mount` unit on
+each node. Data lives in Redis+GCS; the mount point is just the POSIX view.
+
+The unit file `conf/storage.mount` has a password-less Redis URL in `What=`
+(`redis://tpu0:6379/0`). The password is supplied to the `juicefs` mount
+process via `META_PASSWORD` (a JuiceFS-recognised env var), loaded from
+`/etc/juicefs/redis.env` (mode `0600 root:root`) via the unit's
+`EnvironmentFile=` directive.
+
+This keeps the password out of:
+
+- `systemd`'s stored `ExecMount` argv (otherwise visible via
+  `systemctl show -p ExecMount` to any logged-in user);
+- `/bin/mount`'s `/proc/<pid>/cmdline`;
+- the mounted juicefs process's `/proc/<pid>/cmdline`.
+
+It lives only in `/etc/juicefs/redis.env` (root-only) and in the mount
+process's `/proc/<pid>/environ`, which is mode 0400 owner-only.
+`systemctl show` shows only the *path* of `EnvironmentFile=`, not its
+contents — verified by inspection on a throwaway service unit.
+
+The unit also sets `Environment="GOOGLE_APPLICATION_CREDENTIALS=/etc/juicefs/sa-private-key.json"`
+so the JuiceFS client can authenticate with GCS. Without this, uploads get
+403 "Provided scope(s) are not authorized" because the VM's metadata-server
+tokens are read-only (see "Trouble: Service account and OAuth scopes" above).
+The SA key file must be installed on each node before first mount.
+
+The FUSE mount helper is discovered by `mount(8)` at `/sbin/mount.juicefs`,
+which is a symlink to `/usr/bin/juicefs` (the PPA binary). On Ubuntu 22.04
+`/sbin` is a symlink to `usr/sbin`, so one symlink covers both lookup paths.
+
+Install SA key, Redis env file, mount helper symlink, mount point, and unit
+file on every node:
+
+```
+for t in 0 1 2 3; do
+  scp secrets/tpu-juicefs-sa-private-key.json secrets/redis.env \
+      conf/storage.mount tpu$t:
+  ssh tpu$t 'bash -s' <<'REMOTE'
+    set -euo pipefail
+    umask 077
+    sudo install -d -m 0755 /etc/juicefs
+    sudo install -m 0600 -o root -g root ~/tpu-juicefs-sa-private-key.json /etc/juicefs/sa-private-key.json
+    sudo install -m 0600 -o root -g root ~/redis.env /etc/juicefs/redis.env
+    sudo install -m 0644 -o root -g root ~/storage.mount /etc/systemd/system/storage.mount
+    rm ~/tpu-juicefs-sa-private-key.json ~/redis.env ~/storage.mount
+    sudo ln -sfn /usr/bin/juicefs /sbin/mount.juicefs
+    sudo mkdir -p /storage
+REMOTE
+done
+```
+
+On tpu0 only, install a drop-in that orders the mount after `redis-server.service`
+(the other nodes reach Redis over the network and need only the shared unit):
+
+```
+sudo mkdir -p /etc/systemd/system/storage.mount.d
+sudo install -m 0644 -o root -g root conf/storage.mount.d-redis.conf \
+    /etc/systemd/system/storage.mount.d/redis.conf
+```
+
+Reload systemd and enable the mount on every node:
+
+```
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo systemctl daemon-reload && sudo systemctl enable --now storage.mount'
+done
+```
+
+Verify: `mount | grep /storage` on each node shows
+`JuiceFS:clusterhome on /storage type fuse.juicefs`. Non-root
+`systemctl show -p ExecMount storage.mount` should show the argv containing
+`redis://tpu0:6379/0` (no password). Non-root `cat /etc/juicefs/redis.env`
+should fail with permission denied.
+
+### Migrate a user's home to `/storage`
+
+One-time procedure per user. This doc is the manual checklist we used for
+the first user; once more users are through and the edge cases are known,
+this becomes `admin-scripts/migrate-home.sh`.
+
+**Prereqs to verify before touching anything:**
+
+- `/storage` mounted on all 4 nodes.
+- User has no active session anywhere. Check with `who` on each node; if
+  the user has a tmux session, coordinate before disrupting it.
+- UIDs and GIDs match across all 4 nodes — this is **not optional**.
+  Shared storage stores numeric IDs; a mismatch means files written on
+  one node appear owned by a different username on another, silently.
+  Check:
+  ```
+  for t in 0 1 2 3; do
+    if [ $t -eq 0 ]; then getent passwd USERNAME
+    else ssh tpu$t "getent passwd USERNAME"
+    fi
+  done
+  ```
+- If UIDs drift, renumber on the mismatched node with `usermod -u NEW`
+  and `groupmod -g NEW`. `usermod -u -g NEW_PRIMARY` auto-chowns files
+  inside the user's home directory (both UID and primary GID) if you
+  pass `-g`; `groupmod -g` alone does **not** walk the filesystem.
+  After renumber: `sudo chgrp -R USERNAME /home/USERNAME` to be safe,
+  and scan for orphans outside the home with
+  `sudo find / -xdev \( -nouser -o -nogroup \) -print` (check `/tmp`,
+  `/var/spool/cron`, `/var/mail` etc.).
+- `find -nogroup` only catches files whose current GID is **unassigned**.
+  If a renumber reassigned the old GID to a *different* user, files with
+  that GID silently appear owned by the wrong group — `find` will not
+  flag them. So chgrp-the-home is mandatory, not just a belt-and-braces
+  step. For each renumbered user, verify with
+  `sudo find /home/USERNAME -not \( -user USERNAME -group USERNAME \) -printf "%u:%g %p\n"`
+  and expect no output.
+
+**One-time cluster setup (only needed before the first migration):**
+
+```
+sudo install -d -m 0755 -o root -g root /storage/home
+```
+
+**Migration steps (run from tpu0):**
+
+1. Copy tpu0's `/home/USERNAME` into `/storage/home/USERNAME` — this is
+   the canonical merged home:
+   ```
+   sudo rsync -aHAX --numeric-ids /home/USERNAME/ /storage/home/USERNAME/
+   ```
+2. On each of tpu1/2/3, pull the node-local `/home/USERNAME` into a
+   named subdir so the user can still find their per-node state:
+   ```
+   for t in 1 2 3; do
+     ssh tpu$t "sudo rsync -aHAX --numeric-ids /home/USERNAME/ /storage/home/USERNAME/tpu$t/"
+   done
+   ```
+   (Each rsync runs locally on the target node via `ssh ... sudo rsync`
+   — matt's `NOPASSWD: ALL` lets this work non-interactively, and
+   staying local avoids the root-ssh known_hosts issue.)
+3. Normalize ownership, in case of post-renumber GID drift:
+   ```
+   sudo chown -R USERNAME:USERNAME /storage/home/USERNAME
+   ```
+4. Switch the user's home on every node:
+   ```
+   for t in 0 1 2 3; do
+     if [ $t -eq 0 ]; then sudo usermod -d /storage/home/USERNAME USERNAME
+     else ssh tpu$t "sudo usermod -d /storage/home/USERNAME USERNAME"
+     fi
+   done
+   ```
+   Do not pass `-m`; that would try to *move* `/home/USERNAME` into
+   `/storage/home/USERNAME`, which already exists, and fail.
+5. Verify each node's `getent passwd USERNAME` now ends in
+   `/storage/home/USERNAME`, then verify a login shell lands there:
+   ```
+   for t in 0 1 2 3; do
+     if [ $t -eq 0 ]; then sudo -u USERNAME -i pwd
+     else ssh tpu$t "sudo -u USERNAME -i pwd"
+     fi
+   done
+   ```
+   Best final check: `ssh USERNAME@tpuN` from the user's laptop on each
+   node — this exercises sshd reading `authorized_keys` from the new
+   home end-to-end.
+
+**Leave `/home/USERNAME` in place on each node** as a local backup. A
+cleanup pass that removes the old per-node homes is a separate later step.
 
 TODO: Job management
 --------------------

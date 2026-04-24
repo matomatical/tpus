@@ -1,0 +1,16 @@
+[Unit]
+Description=JuiceFS cluster storage
+Requires=network-online.target
+After=network-online.target
+
+[Mount]
+What=redis://tpu0:6379/0
+Where=/storage
+Type=juicefs
+Environment="GOOGLE_APPLICATION_CREDENTIALS=/etc/juicefs/sa-private-key.json"
+EnvironmentFile=/etc/juicefs/redis.env
+Options=_netdev,allow_other,cache-dir=/var/jfsCache,cache-size=40960,buffer-size=600,writeback,upload-delay=1s
+
+[Install]
+WantedBy=remote-fs.target
+WantedBy=multi-user.target
