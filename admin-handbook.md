@@ -863,36 +863,49 @@ Currently installed on: tpu1, tpu2, tpu3.
 The cluster filesystem is mounted at `/storage` via a systemd `.mount` unit on
 each node. Data lives in Redis+GCS; the mount point is just the POSIX view.
 
-The unit file `conf/storage.mount` keeps `PASSWORD` as a literal placeholder in
-the repo (safe to commit). At deploy time, substitute `$REDIS_PASSWORD` from
-`secrets/redis.env` and install the unit with mode `0600 root:root` so
-non-admin users can't read the Redis password from `/etc/systemd/system/`.
+The unit file `conf/storage.mount` has a password-less Redis URL in `What=`
+(`redis://tpu0:6379/0`). The password is supplied to the `juicefs` mount
+process via `META_PASSWORD` (a JuiceFS-recognised env var), loaded from
+`/etc/juicefs/redis.env` (mode `0600 root:root`) via the unit's
+`EnvironmentFile=` directive.
 
-The unit sets `Environment="GOOGLE_APPLICATION_CREDENTIALS=/etc/juicefs/sa-private-key.json"`
+This keeps the password out of:
+
+- `systemd`'s stored `ExecMount` argv (otherwise visible via
+  `systemctl show -p ExecMount` to any logged-in user);
+- `/bin/mount`'s `/proc/<pid>/cmdline`;
+- the mounted juicefs process's `/proc/<pid>/cmdline`.
+
+It lives only in `/etc/juicefs/redis.env` (root-only) and in the mount
+process's `/proc/<pid>/environ`, which is mode 0400 owner-only.
+`systemctl show` shows only the *path* of `EnvironmentFile=`, not its
+contents — verified by inspection on a throwaway service unit.
+
+The unit also sets `Environment="GOOGLE_APPLICATION_CREDENTIALS=/etc/juicefs/sa-private-key.json"`
 so the JuiceFS client can authenticate with GCS. Without this, uploads get
 403 "Provided scope(s) are not authorized" because the VM's metadata-server
 tokens are read-only (see "Trouble: Service account and OAuth scopes" above).
 The SA key file must be installed on each node before first mount.
 
-The FUSE mount helper is discovered by `mount(8)` at `/sbin/mount.juicefs`. The
-PPA-installed binary lives at `/usr/bin/juicefs`, so the helper symlink points
-there. (On Ubuntu 22.04 `/sbin` is already a symlink to `usr/sbin`, so one
-symlink covers both lookup paths.)
+The FUSE mount helper is discovered by `mount(8)` at `/sbin/mount.juicefs`,
+which is a symlink to `/usr/bin/juicefs` (the PPA binary). On Ubuntu 22.04
+`/sbin` is a symlink to `usr/sbin`, so one symlink covers both lookup paths.
 
-Install SA key, mount helper, mount point, and unit file on every node:
+Install SA key, Redis env file, mount helper symlink, mount point, and unit
+file on every node:
 
 ```
 for t in 0 1 2 3; do
-  scp secrets/tpu-juicefs-sa-private-key.json conf/storage.mount tpu$t:
+  scp secrets/tpu-juicefs-sa-private-key.json secrets/redis.env \
+      conf/storage.mount tpu$t:
   ssh tpu$t 'bash -s' <<'REMOTE'
     set -euo pipefail
-    source ~/tpus/secrets/redis.env
     umask 077
     sudo install -d -m 0755 /etc/juicefs
     sudo install -m 0600 -o root -g root ~/tpu-juicefs-sa-private-key.json /etc/juicefs/sa-private-key.json
-    sed "s|PASSWORD|$REDIS_PASSWORD|" ~/storage.mount > ~/storage.mount.real
-    sudo install -m 0600 -o root -g root ~/storage.mount.real /etc/systemd/system/storage.mount
-    rm ~/storage.mount ~/storage.mount.real ~/tpu-juicefs-sa-private-key.json
+    sudo install -m 0600 -o root -g root ~/redis.env /etc/juicefs/redis.env
+    sudo install -m 0644 -o root -g root ~/storage.mount /etc/systemd/system/storage.mount
+    rm ~/tpu-juicefs-sa-private-key.json ~/redis.env ~/storage.mount
     sudo ln -sfn /usr/bin/juicefs /sbin/mount.juicefs
     sudo mkdir -p /storage
 REMOTE
@@ -918,8 +931,92 @@ done
 
 Verify: `mount | grep /storage` on each node shows
 `JuiceFS:clusterhome on /storage type fuse.juicefs`. Non-root
-`systemctl cat storage.mount` should return permission denied, since the
-password is in the unit file and only root can read it.
+`systemctl show -p ExecMount storage.mount` should show the argv containing
+`redis://tpu0:6379/0` (no password). Non-root `cat /etc/juicefs/redis.env`
+should fail with permission denied.
+
+### Migrate a user's home to `/storage`
+
+One-time procedure per user. This doc is the manual checklist we used for
+the first user; once more users are through and the edge cases are known,
+this becomes `admin-scripts/migrate-home.sh`.
+
+**Prereqs to verify before touching anything:**
+
+- `/storage` mounted on all 4 nodes.
+- User has no active session anywhere. Check with `who` on each node; if
+  the user has a tmux session, coordinate before disrupting it.
+- UIDs and GIDs match across all 4 nodes — this is **not optional**.
+  Shared storage stores numeric IDs; a mismatch means files written on
+  one node appear owned by a different username on another, silently.
+  Check:
+  ```
+  for t in 0 1 2 3; do
+    if [ $t -eq 0 ]; then getent passwd USERNAME
+    else ssh tpu$t "getent passwd USERNAME"
+    fi
+  done
+  ```
+- If UIDs drift, renumber on the mismatched node with `usermod -u NEW`
+  and `groupmod -g NEW`. `usermod -u` auto-chowns files inside the home
+  directory; `groupmod -g` does **not** — run `sudo chgrp -R USERNAME
+  /home/USERNAME` after renumber, and scan for orphans outside the home
+  with `sudo find / -xdev \( -nouser -o -nogroup \) -print` (check
+  `/tmp`, `/var/spool/cron`, `/var/mail` etc.). Delete or chown as
+  appropriate.
+
+**One-time cluster setup (only needed before the first migration):**
+
+```
+sudo install -d -m 0755 -o root -g root /storage/home
+```
+
+**Migration steps (run from tpu0):**
+
+1. Copy tpu0's `/home/USERNAME` into `/storage/home/USERNAME` — this is
+   the canonical merged home:
+   ```
+   sudo rsync -aHAX --numeric-ids /home/USERNAME/ /storage/home/USERNAME/
+   ```
+2. On each of tpu1/2/3, pull the node-local `/home/USERNAME` into a
+   named subdir so the user can still find their per-node state:
+   ```
+   for t in 1 2 3; do
+     ssh tpu$t "sudo rsync -aHAX --numeric-ids /home/USERNAME/ /storage/home/USERNAME/tpu$t/"
+   done
+   ```
+   (Each rsync runs locally on the target node via `ssh ... sudo rsync`
+   — matt's `NOPASSWD: ALL` lets this work non-interactively, and
+   staying local avoids the root-ssh known_hosts issue.)
+3. Normalize ownership, in case of post-renumber GID drift:
+   ```
+   sudo chown -R USERNAME:USERNAME /storage/home/USERNAME
+   ```
+4. Switch the user's home on every node:
+   ```
+   for t in 0 1 2 3; do
+     if [ $t -eq 0 ]; then sudo usermod -d /storage/home/USERNAME USERNAME
+     else ssh tpu$t "sudo usermod -d /storage/home/USERNAME USERNAME"
+     fi
+   done
+   ```
+   Do not pass `-m`; that would try to *move* `/home/USERNAME` into
+   `/storage/home/USERNAME`, which already exists, and fail.
+5. Verify each node's `getent passwd USERNAME` now ends in
+   `/storage/home/USERNAME`, then verify a login shell lands there:
+   ```
+   for t in 0 1 2 3; do
+     if [ $t -eq 0 ]; then sudo -u USERNAME -i pwd
+     else ssh tpu$t "sudo -u USERNAME -i pwd"
+     fi
+   done
+   ```
+   Best final check: `ssh USERNAME@tpuN` from the user's laptop on each
+   node — this exercises sshd reading `authorized_keys` from the new
+   home end-to-end.
+
+**Leave `/home/USERNAME` in place on each node** as a local backup. A
+cleanup pass that removes the old per-node homes is a separate later step.
 
 TODO: Job management
 --------------------
