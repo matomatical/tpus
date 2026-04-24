@@ -301,20 +301,32 @@ ssh-keygen -t ed25519 -f ~/.ssh/mfr-tpu -C <USERNAME>
 ```
 
 The key will have format `ssh-ed25519 BLAHBLAH etc`, take the `BLAHBLAH` bit
-only and their chosen username and run it through the user creation script from
-any VM (e.g. tpu0). The script creates the user on all 4 VMs, sets up their
-external SSH key, and generates intra-cluster SSH keys so they can `ssh tpuX`
-between VMs. For example:
+only and their chosen username and run it through `adduser.sh` from tpu0.
+The script creates the user with matching UID/GID on all 4 VMs, home at
+`/storage/home/<username>` (on shared JuiceFS), installs the external SSH
+key, and generates intra-cluster SSH keys so they can `ssh tpuX` between
+VMs. For example:
 
 ```
 ./adduser.sh afiq AAAAC3NzaC1lZDI1NTE5AAAAINmp4YYoMgXP8MEQsMjkla+o81pwI7hj9EN6eIbFZzvV
 ```
+
+Remember to append the invocation to `users.md`.
+
+If for some reason you need to create a user on the per-VM boot disks
+(e.g. an admin account that must stay available when `/storage` is down),
+use `adduser-local.sh` instead. It creates a separate `/home/<username>`
+on each VM — the original pre-JuiceFS behaviour.
 
 To set up intra-cluster keys for an existing user (e.g. after re-provisioning):
 
 ```
 ./setup-cluster-keys.sh <username>
 ```
+
+Note: `setup-cluster-keys.sh` still assumes per-VM homes at `/home/<u>`,
+so it currently only fits `adduser-local.sh`-style users (matt, ross).
+Shared-home users already get their cluster keys from `adduser.sh`.
 
 TPU logging permission
 ----------------------
@@ -982,94 +994,11 @@ should fail with permission denied.
 
 ### Migrate a user's home to `/storage`
 
-One-time procedure per user. This doc is the manual checklist we used for
-the first user; once more users are through and the edge cases are known,
-this becomes `admin-scripts/migrate-home.sh`.
-
-**Prereqs to verify before touching anything:**
-
-- `/storage` mounted on all 4 nodes.
-- User has no active session anywhere. Check with `who` on each node; if
-  the user has a tmux session, coordinate before disrupting it.
-- UIDs and GIDs match across all 4 nodes — this is **not optional**.
-  Shared storage stores numeric IDs; a mismatch means files written on
-  one node appear owned by a different username on another, silently.
-  Check:
-  ```
-  for t in 0 1 2 3; do
-    if [ $t -eq 0 ]; then getent passwd USERNAME
-    else ssh tpu$t "getent passwd USERNAME"
-    fi
-  done
-  ```
-- If UIDs drift, renumber on the mismatched node with `usermod -u NEW`
-  and `groupmod -g NEW`. `usermod -u -g NEW_PRIMARY` auto-chowns files
-  inside the user's home directory (both UID and primary GID) if you
-  pass `-g`; `groupmod -g` alone does **not** walk the filesystem.
-  After renumber: `sudo chgrp -R USERNAME /home/USERNAME` to be safe,
-  and scan for orphans outside the home with
-  `sudo find / -xdev \( -nouser -o -nogroup \) -print` (check `/tmp`,
-  `/var/spool/cron`, `/var/mail` etc.).
-- `find -nogroup` only catches files whose current GID is **unassigned**.
-  If a renumber reassigned the old GID to a *different* user, files with
-  that GID silently appear owned by the wrong group — `find` will not
-  flag them. So chgrp-the-home is mandatory, not just a belt-and-braces
-  step. For each renumbered user, verify with
-  `sudo find /home/USERNAME -not \( -user USERNAME -group USERNAME \) -printf "%u:%g %p\n"`
-  and expect no output.
-
-**One-time cluster setup (only needed before the first migration):**
-
-```
-sudo install -d -m 0755 -o root -g root /storage/home
-```
-
-**Migration steps (run from tpu0):**
-
-1. Copy tpu0's `/home/USERNAME` into `/storage/home/USERNAME` — this is
-   the canonical merged home:
-   ```
-   sudo rsync -aHAX --numeric-ids /home/USERNAME/ /storage/home/USERNAME/
-   ```
-2. On each of tpu1/2/3, pull the node-local `/home/USERNAME` into a
-   named subdir so the user can still find their per-node state:
-   ```
-   for t in 1 2 3; do
-     ssh tpu$t "sudo rsync -aHAX --numeric-ids /home/USERNAME/ /storage/home/USERNAME/tpu$t/"
-   done
-   ```
-   (Each rsync runs locally on the target node via `ssh ... sudo rsync`
-   — matt's `NOPASSWD: ALL` lets this work non-interactively, and
-   staying local avoids the root-ssh known_hosts issue.)
-3. Normalize ownership, in case of post-renumber GID drift:
-   ```
-   sudo chown -R USERNAME:USERNAME /storage/home/USERNAME
-   ```
-4. Switch the user's home on every node:
-   ```
-   for t in 0 1 2 3; do
-     if [ $t -eq 0 ]; then sudo usermod -d /storage/home/USERNAME USERNAME
-     else ssh tpu$t "sudo usermod -d /storage/home/USERNAME USERNAME"
-     fi
-   done
-   ```
-   Do not pass `-m`; that would try to *move* `/home/USERNAME` into
-   `/storage/home/USERNAME`, which already exists, and fail.
-5. Verify each node's `getent passwd USERNAME` now ends in
-   `/storage/home/USERNAME`, then verify a login shell lands there:
-   ```
-   for t in 0 1 2 3; do
-     if [ $t -eq 0 ]; then sudo -u USERNAME -i pwd
-     else ssh tpu$t "sudo -u USERNAME -i pwd"
-     fi
-   done
-   ```
-   Best final check: `ssh USERNAME@tpuN` from the user's laptop on each
-   node — this exercises sshd reading `authorized_keys` from the new
-   home end-to-end.
-
-**Leave `/home/USERNAME` in place on each node** as a local backup. A
-cleanup pass that removes the old per-node homes is a separate later step.
+One-time procedure per user, codified as `admin-scripts/migrate-home.sh
+<username>` (run from tpu0). It does preflight checks, then runs all 4
+rsyncs in parallel with progress lines, then flips the passwd entry and
+verifies `sudo -u <user> -i pwd` on each node. The manual checklist below
+documents the same steps in case you ever need to do it by hand.
 
 TODO: Job management
 --------------------

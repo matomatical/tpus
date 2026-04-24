@@ -1,6 +1,14 @@
 #!/bin/bash
-# Create a new user on all cluster VMs and set up intra-cluster SSH.
-# Run as matt (needs sudo access and inter-VM SSH).
+# Create a new cluster user with a shared home on /storage.
+#
+# - Creates matching UID and GID on all 4 VMs.
+# - Creates the home directory once at /storage/home/<username> (visible on
+#   every VM via JuiceFS).
+# - Installs the provided external SSH key in ~/.ssh/authorized_keys.
+# - Generates an intra-cluster SSH key pair (~/.ssh/cluster[.pub]) so the
+#   user can `ssh tpuX` between VMs.
+#
+# Run as matt from tpu0.
 #
 # Usage: ./adduser.sh <username> <ssh-key-string>
 
@@ -8,71 +16,91 @@ set -euo pipefail
 
 USERNAME="${1:?Usage: $0 <username> <ssh-key-string>}"
 KEYSTR="${2:?Usage: $0 <username> <ssh-key-string>}"
-HOSTS=(tpu0 tpu1 tpu2 tpu3)
+HOME_NEW="/storage/home/$USERNAME"
 
-# Step 1: Create user and add external SSH key on all VMs
-echo "Creating user $USERNAME on all VMs..."
-for host in "${HOSTS[@]}"; do
-    echo "=== $host ==="
-    ssh "$host" sudo bash <<REMOTE
-        set -euo pipefail
-        HOMEDIR="/home/$USERNAME"
+# --- Preflight ------------------------------------------------------------
 
-        # Create user (skip if already exists)
-        if id "$USERNAME" &>/dev/null; then
-            echo "User $USERNAME already exists, skipping creation"
-        else
-            useradd -m -d "\$HOMEDIR" -s /bin/bash "$USERNAME"
-        fi
+# Must be on tpu0 (UID/GID assignment + home creation happen here).
+tpu0_ip=$(getent hosts tpu0 | awk '{print $1}')
+if ! hostname -I | tr ' ' '\n' | grep -qxF "$tpu0_ip"; then
+    echo "ERROR: run from tpu0 (tpu0=$tpu0_ip, my IPs: $(hostname -I))" >&2
+    exit 1
+fi
 
-        # Add external SSH key
-        mkdir -p "\$HOMEDIR/.ssh"
-        if ! grep -qF '$KEYSTR' "\$HOMEDIR/.ssh/authorized_keys" 2>/dev/null; then
-            echo "ssh-ed25519 $KEYSTR $USERNAME" >> "\$HOMEDIR/.ssh/authorized_keys"
-        fi
-        chmod 700 "\$HOMEDIR/.ssh"
-        chmod 600 "\$HOMEDIR/.ssh/authorized_keys"
-        chown -R "$USERNAME:$USERNAME" "\$HOMEDIR/.ssh"
-
-        echo "Done on \$(hostname)"
-REMOTE
+# /storage must be mounted on every node.
+for t in 0 1 2 3; do
+    if [ "$t" = 0 ]; then
+        mountpoint -q /storage \
+            || { echo "ERROR: /storage not mounted on tpu0" >&2; exit 1; }
+    else
+        ssh "tpu$t" "mountpoint -q /storage" \
+            || { echo "ERROR: /storage not mounted on tpu$t" >&2; exit 1; }
+    fi
 done
 
-# Step 2: Generate and distribute intra-cluster keys
-echo ""
-echo "Setting up intra-cluster SSH keys..."
-TMPDIR=$(mktemp -d)
-trap 'rm -rf "$TMPDIR"' EXIT
-ssh-keygen -t ed25519 -f "$TMPDIR/cluster" -N "" -C "$USERNAME@cluster" -q
-PUBKEY=$(<"$TMPDIR/cluster.pub")
+# User must not yet exist on any node, and home path must be clear.
+if id "$USERNAME" &>/dev/null; then
+    echo "ERROR: user '$USERNAME' already exists on tpu0" >&2; exit 1
+fi
+for t in 1 2 3; do
+    if ssh "tpu$t" "id $USERNAME" &>/dev/null; then
+        echo "ERROR: user '$USERNAME' already exists on tpu$t" >&2; exit 1
+    fi
+done
+if [ -e "$HOME_NEW" ]; then
+    echo "ERROR: $HOME_NEW already exists" >&2; exit 1
+fi
 
-for host in "${HOSTS[@]}"; do
-    echo "=== $host ==="
+sudo install -d -m 0755 -o root -g root /storage/home
 
-    # Copy key files to temp location on remote host
-    scp -q "$TMPDIR/cluster" "$TMPDIR/cluster.pub" "$host:/tmp/"
+# --- 1. Create user + home on tpu0 (origin assigns UID/GID) ---------------
 
-    # Install key pair and authorize
-    ssh "$host" sudo bash <<REMOTE
-        set -euo pipefail
-        HOMEDIR="/home/$USERNAME"
+echo "=== Creating '$USERNAME' on tpu0 (origin) ==="
+sudo useradd -m -d "$HOME_NEW" -s /bin/bash "$USERNAME"
+UID_NEW=$(id -u "$USERNAME")
+GID_NEW=$(id -g "$USERNAME")
+echo "  uid=$UID_NEW gid=$GID_NEW home=$HOME_NEW"
 
-        # Install key pair
-        mv /tmp/cluster /tmp/cluster.pub "\$HOMEDIR/.ssh/"
+# --- 2. Create matching user on tpu1, tpu2, tpu3 --------------------------
+#
+# -M on useradd: don't create a home dir (it already exists on /storage).
+# groupadd -g pins the GID; without this, useradd would auto-create the
+# user's primary group with the next free GID on each node, diverging from
+# tpu0. Shared storage resolves ownership by numeric ID, so GIDs must match.
 
-        # Add cluster public key to authorized_keys (idempotent)
-        if ! grep -qF '$PUBKEY' "\$HOMEDIR/.ssh/authorized_keys" 2>/dev/null; then
-            echo '$PUBKEY' >> "\$HOMEDIR/.ssh/authorized_keys"
-        fi
-
-        # Fix ownership and permissions
-        chown -R "$USERNAME:$USERNAME" "\$HOMEDIR/.ssh"
-        chmod 600 "\$HOMEDIR/.ssh/cluster" "\$HOMEDIR/.ssh/authorized_keys"
-        chmod 644 "\$HOMEDIR/.ssh/cluster.pub"
-
-        echo "Done on \$(hostname)"
-REMOTE
+for t in 1 2 3; do
+    echo "=== Creating '$USERNAME' on tpu$t (uid=$UID_NEW, gid=$GID_NEW) ==="
+    ssh "tpu$t" "sudo groupadd -g $GID_NEW $USERNAME \
+              && sudo useradd -M -u $UID_NEW -g $GID_NEW \
+                    -d $HOME_NEW -s /bin/bash $USERNAME"
 done
 
-echo ""
-echo "Done! User $USERNAME created on all VMs with intra-cluster SSH."
+# --- 3. Install external SSH key -----------------------------------------
+
+echo "=== Installing external SSH key ==="
+sudo install -d -m 0700 -o "$USERNAME" -g "$USERNAME" "$HOME_NEW/.ssh"
+echo "ssh-ed25519 $KEYSTR $USERNAME" \
+    | sudo tee -a "$HOME_NEW/.ssh/authorized_keys" > /dev/null
+
+# --- 4. Generate intra-cluster SSH key pair ------------------------------
+#
+# The redirect-read must happen inside sudo because .ssh/ is already 0700
+# owned by the user — matt's shell would fail to open cluster.pub to feed
+# it to tee.
+
+echo "=== Generating intra-cluster SSH key pair ==="
+sudo ssh-keygen -t ed25519 -f "$HOME_NEW/.ssh/cluster" \
+    -N "" -C "$USERNAME@cluster" -q
+sudo sh -c 'cat "$1" >> "$2"' -- \
+    "$HOME_NEW/.ssh/cluster.pub" "$HOME_NEW/.ssh/authorized_keys"
+
+# --- 5. Fix ownership and perms on .ssh ----------------------------------
+
+sudo chown -R "$USERNAME:$USERNAME" "$HOME_NEW/.ssh"
+sudo chmod 0600 "$HOME_NEW/.ssh/authorized_keys" "$HOME_NEW/.ssh/cluster"
+sudo chmod 0644 "$HOME_NEW/.ssh/cluster.pub"
+
+echo
+echo "=== Done! ==="
+echo "  User '$USERNAME' created with shared home at $HOME_NEW."
+echo "  Don't forget to append the invocation to users.md."

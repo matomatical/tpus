@@ -10,8 +10,8 @@ About the cluster
 Hardware
 --------
 
-The "cluster" is at the moment just 4 virtual machines (VMs) running on
-Google Cloud. We'll call them by the following names:
+The "cluster" is a collection of 4 virtual machines (VMs) running on Google
+Cloud. We call them by the following names:
 
 * `tpu0`
 * `tpu1`
@@ -19,39 +19,54 @@ Google Cloud. We'll call them by the following names:
 * `tpu3`
 
 All four of these VMs provide shared access to a single "TPU v4-32"
-accelerator. This is a 32-core, 512 GiB memory, fourth generation TPU,
-that can be used to run high-speed training and inference.
+accelerator. This is a 32-core, 512 GiB memory, fourth generation TPU, that can
+be used to run high-speed training and inference.
 
-Most experiments I usually work on are training small models that use a
-fraction of this 32-core TPU's resources, and wouldn't make good use of
-all 32 cores at once. Therefore, I normally conceptually split up this
-TPU into 16 dual-core, 32 GiB memory "devices". Four of these "devices"
-are accessible from each of the four VMs.
+Each of the four TPU VMs has access to:
 
-The cluster runs close to 24/7, but I expect from time to time we will
-encounter access issues, shifting IP addresses, or etc.; speak to me if
-you have issues accessing the cluster.
-
-Some statistics about each TPU VM:
-
+* Four "TPU devices", which are individual dual-core TPU v4 chips with 32 GiB
+  memory (one dual-core device is 1/16 of the entire TPU v4-32).
 * Two 60-core (120-thread) AMD EPYC 7B12 CPUs.
-* 400 GiB memory.
-* 100 GiB disk space.
+* 400 GiB memory (this is CPU-accessible memory; the above numbers are
+  TPU-accessible memory).
+
+Most experiments I usually work on are training small models that wouldn't make
+good use of all 32 cores at once. Therefore, I normally think of the cluster as
+being a collection of 16 dual-core devices, each with 32 GiB of memory.
+
+The cluster runs 24/7, but I expect from time to time we will encounter access
+issues, shifting IP addresses, or etc.; speak to me if you have issues
+accessing the cluster.
+
+The available storage is as follows:
+
+* Each of the VMs has an independent 100 GiB local disk used to store the
+  operating system and core software.
+* All four VMs are also connected to a 1 TiB bulk storage virtual drive
+  (JuiceFS running on Google Cloud Storage buckets), used for user files.
 
 Software
 --------
 
-The cluster runs Ubuntu 22.04. I can install arbitrary software, let me
-know if you need something that isn't there.
+The cluster runs Ubuntu 22.04. I can install arbitrary software. Non-default
+software installed already:
 
-The system Python is 3.10. The `uv` tool is available for managing
-virtual environments and can install other Python versions as needed
-(e.g. `uv venv --python 3.14`).
+* neovim
+* latex (texlive-full)
+* latexmk
+* ffmpeg
+* pandoc
+* entr
+* uv
 
-Each VM has its own independent disk. Your home directory is separate on
-each node—files you create on one VM will not appear on the others. You
-can `ssh tpuX` and `scp` between VMs to move files around (see the
-SSH section below).
+Let me know if you need something that isn't there. Except:
+
+* For python, I recommend managing your own virtual environments in user-space
+  with uv.
+  * The system Python is 3.10, and uv can install can install other Python
+    versions as needed (e.g. `uv venv --python 3.14`).
+* For nodejs, I recommend installing nvm locally and managing your own
+  installs.
 
 The cluster supports both JAX and PyTorch/XLA for TPU workloads. See the setup
 sections below for each framework.
@@ -82,6 +97,8 @@ if you have another copy elsewhere. For example:
 * If you have valuable experiment logs or results, copy them to your
   local machine after the experiments are done.
 
+TODO: In future, I will implement ~daily backups of the shared storage part of
+the cluster. But this is not yet live.
 
 Creating an account
 ===================
@@ -89,6 +106,7 @@ Creating an account
 To access the cluster, please follow these instructions:
 
 1. Select a unique username.
+
 2. Create an SSH key on your local device. You will use this SSH key to
    access the TPU VMs. I recommend using this command:
 
@@ -150,11 +168,7 @@ between VMs directly. From any VM, just use:
 
 ```
 ssh tpu2            # open a shell on tpu2
-scp file.txt tpu3:  # copy a file to tpu3
 ```
-
-This is handy for copying files between VMs, or for setting up your
-environment on multiple VMs at once.
 
 Working with files
 ------------------
@@ -178,8 +192,7 @@ There are several ways to transfer files to/from and edit files on the cluster.
 2. **Git + GitHub:** An easier way to copy a lot of files and keep them synced
    between your local environment and the VMs is to use `git` and GitHub. You
    can edit locally or on the VM, commit, push, and then pull where you want
-   the code. More details on setting up GitHub authentication in the next
-   section.
+   the code. More details on setting up GitHub authentication below.
 
 3. **Terminal-based editors:** You can edit code directly on the cluster using
    a terminal-based editor. This can also be slow if you are not used to it but
@@ -209,6 +222,35 @@ git and push to GitHub regularly. If you generate important files on the VM,
 you should copy them to your local device or store them in git if they are not
 too large.
 
+Cluster storage
+---------------
+
+The good news is, your home directory `/storage/home/<username>` lives on the
+shared filesystem, which means once you get your files to one of the VMs, they
+will be accessible automatically from all of them.
+
+However, there are some quirks:
+
+* Changes aren't synced immediately. It can take a few seconds for small files
+  to replicate across the cluster. Big files longer as they need to travel to
+  GCS and back through the local network. Try to avoid assuming changes will be
+  synced immediately.
+
+* The underlying storage is a bit slow. The first time you want to access files
+  from one of the VMs, it has to fetch those files from the local network,
+  which is slower than using the boot disks. (In practice, this shouldn't be a
+  big issue, because after the first time, the files will be cached---see the
+  next point.)
+
+* Most of the 100 GiB boot disk is configured to serve as a very fast cache for
+  reads/writes. That means the first time you, e.g., load a big venv, it can
+  take a minute (JAX) or 5 minutes (PyTorch) to load, but subsequent times it
+  should be fast (unless the cache gets full, in which case you need to wait
+  again).
+
+This is a new set-up and there might be teething issues---reach out if you
+experience undue filesystem lag or other issues.
+
 Setting up GitHub
 -----------------
 
@@ -230,8 +272,7 @@ the simpler steps below.
 2. Add the public key (`~/.ssh/github.pub`) to your GitHub account
    under Settings > SSH and GPG keys.
 
-3. Add the following to `~/.ssh/config` on each VM where you want to
-   use git:
+3. Add the following to `~/.ssh/config`:
 
    ```
    Host github.com
@@ -240,19 +281,15 @@ the simpler steps below.
      IdentitiesOnly yes
    ```
 
-4. Copy the key and config to the other VMs. You can do this directly
-   from tpu0 using inter-VM SSH:
-
-   ```
-   for t in 1 2 3; do scp ~/.ssh/github{,.pub} ~/.ssh/config tpu$t:.ssh/; done
-   ```
+   Your home (and `.ssh/`) is shared across all 4 VMs, so this setup
+   applies everywhere automatically.
 
 Setting up a virtual environment
 --------------------------------
 
 You will need a Python virtual environment to install your framework
-and other packages. Each VM has its own disk, so you'll need to create
-a venv on each VM you want to use.
+and other packages. Because your home directory is on shared storage,
+a venv created once in your home is usable from all 4 VMs.
 
 Remember to activate your venv (`source venv/bin/activate`) each time
 you log in before running your code.
@@ -621,18 +658,6 @@ Customising other tools
 Most other changes are easier, make yourself at home via dotfiles like you
 normally would. You can set up your path, default editor, etc., in your
 profile. If you want me to install some missing standard software, just ask.
-
-Installed already:
-
-* nvim
-* latex (texlive-full)
-* latexmk
-* ffmpeg
-* pandoc
-* entr
-
-For python and nodejs I recommend managing your own virtual environments in
-user-space with `uv` and `nvm` respectively.
 
 Graduating to your own cluster
 ------------------------------
