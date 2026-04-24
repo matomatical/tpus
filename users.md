@@ -11,10 +11,11 @@ All are ssh-ed25519 keys
 ./adduser.sh cath AAAAC3NzaC1lZDI1NTE5AAAAION481lDFHSHhZcGg/0pRR0K5UOQSW6L688d1keXirus
 ./adduser.sh lexi AAAAC3NzaC1lZDI1NTE5AAAAIHf4jjukwjjFBdyh0JOPSczrk5R6kMAXEVxmjnJ1+j6S
 ./adduser.sh laura AAAAC3NzaC1lZDI1NTE5AAAAIPRrc/eoi5x2E9LtDEHt7BYxkTWg3EOLeMIwAbpbQGrH
+./adduser.sh dafang AAAAC3NzaC1lZDI1NTE5AAAAIJEyKJTj5TlynzU+qGb0SwEfGK5Kfou/lASMXZqK9Dey
+./adduser.sh mfr AAAAC3NzaC1lZDI1NTE5AAAAIKnIKMahIDRJISlWvW26uV6ccW9oA7C3SFPU8WIKN/C9
 ```
 
 TODO:
 
-* dafang
 * miguel
 
