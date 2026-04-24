@@ -868,23 +868,31 @@ the repo (safe to commit). At deploy time, substitute `$REDIS_PASSWORD` from
 `secrets/redis.env` and install the unit with mode `0600 root:root` so
 non-admin users can't read the Redis password from `/etc/systemd/system/`.
 
+The unit sets `Environment="GOOGLE_APPLICATION_CREDENTIALS=/etc/juicefs/sa-private-key.json"`
+so the JuiceFS client can authenticate with GCS. Without this, uploads get
+403 "Provided scope(s) are not authorized" because the VM's metadata-server
+tokens are read-only (see "Trouble: Service account and OAuth scopes" above).
+The SA key file must be installed on each node before first mount.
+
 The FUSE mount helper is discovered by `mount(8)` at `/sbin/mount.juicefs`. The
 PPA-installed binary lives at `/usr/bin/juicefs`, so the helper symlink points
 there. (On Ubuntu 22.04 `/sbin` is already a symlink to `usr/sbin`, so one
 symlink covers both lookup paths.)
 
-Install mount helper, mount point, and unit file on every node:
+Install SA key, mount helper, mount point, and unit file on every node:
 
 ```
 for t in 0 1 2 3; do
-  scp conf/storage.mount tpu$t:
+  scp secrets/tpu-juicefs-sa-private-key.json conf/storage.mount tpu$t:
   ssh tpu$t 'bash -s' <<'REMOTE'
     set -euo pipefail
     source ~/tpus/secrets/redis.env
     umask 077
+    sudo install -d -m 0755 /etc/juicefs
+    sudo install -m 0600 -o root -g root ~/tpu-juicefs-sa-private-key.json /etc/juicefs/sa-private-key.json
     sed "s|PASSWORD|$REDIS_PASSWORD|" ~/storage.mount > ~/storage.mount.real
     sudo install -m 0600 -o root -g root ~/storage.mount.real /etc/systemd/system/storage.mount
-    rm ~/storage.mount ~/storage.mount.real
+    rm ~/storage.mount ~/storage.mount.real ~/tpu-juicefs-sa-private-key.json
     sudo ln -sfn /usr/bin/juicefs /sbin/mount.juicefs
     sudo mkdir -p /storage
 REMOTE

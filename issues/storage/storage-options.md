@@ -428,7 +428,8 @@ After=network-online.target
 What=redis://:PASSWORD@tpu0:6379/0
 Where=/storage
 Type=juicefs
-Options=_netdev,allow_other,cache-dir=/var/jfsCache,cache-size=40960,buffer-size=600,writeback,upload-delay=1m
+Environment="GOOGLE_APPLICATION_CREDENTIALS=/etc/juicefs/sa-private-key.json"
+Options=_netdev,allow_other,cache-dir=/var/jfsCache,cache-size=40960,buffer-size=600,writeback,upload-delay=1s
 
 [Install]
 WantedBy=remote-fs.target
@@ -436,6 +437,11 @@ WantedBy=multi-user.target
 ```
 
 Note: the FUSE option is `allow_other` (underscore), not `allow-other`.
+
+`Environment=GOOGLE_APPLICATION_CREDENTIALS=...` is required because the TPU
+VMs' metadata-server tokens are read-only for GCS (see cluster provisioning
+notes); JuiceFS must use the SA key file to authenticate uploads. Install the
+key on each node at `/etc/juicefs/sa-private-key.json`, mode `0600 root:root`.
 
 For tpu0 only, add a drop-in at `/etc/systemd/system/storage.mount.d/redis.conf`
 (mode `0644`) that orders the mount after `redis-server.service`. Other nodes
@@ -738,10 +744,16 @@ small test transfer.
 * **`--writeback`**: Yes, use it. If a node hard-crashes, losing the last
   30-60s of a text log is acceptable — we'd restart from the last checkpoint
   anyway. The write performance boost is worth it.
-* **`--upload-delay`**: Yes, use `--upload-delay 1m`. Requires `--writeback`.
-  Batches small appends (e.g. W&B, training logs) into fewer GCS objects,
-  reducing Class A operation costs and slice fragmentation. JuiceFS will
-  still upload early if cache space runs low.
+* **`--upload-delay`**: Currently `1s` in production. `1m` was the original
+  plan (batches small appends from W&B / training logs into fewer GCS
+  objects). Changed to `1s` pre-emptively: with `1m`, cross-node reads of
+  newly-written files would return EIO for up to a minute (the writer's
+  rawstaging isn't visible to other JuiceFS CE clients, they see metadata
+  in Redis but GETs to GCS miss until the writer uploads). `1s` still
+  batches truly-ephemeral compile/uv temp files but keeps cross-node
+  read-after-write coherent at human timescales. JuiceFS warns "1s is too
+  small and not recommended" — revisit if we see unexpected GCS API-call
+  costs in billing.
 * **Hybrid checkpointing**: Not needed initially. If models grow past a few
   GB, write checkpoints directly to `gs://` via JAX/Orbax to avoid cache
   thrashing. Revisit later.

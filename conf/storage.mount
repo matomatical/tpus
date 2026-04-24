@@ -7,7 +7,8 @@ After=network-online.target
 What=redis://:PASSWORD@tpu0:6379/0
 Where=/storage
 Type=juicefs
-Options=_netdev,allow_other,cache-dir=/var/jfsCache,cache-size=40960,buffer-size=600,writeback,upload-delay=1m
+Environment="GOOGLE_APPLICATION_CREDENTIALS=/etc/juicefs/sa-private-key.json"
+Options=_netdev,allow_other,cache-dir=/var/jfsCache,cache-size=40960,buffer-size=600,writeback,upload-delay=1s
 
 [Install]
 WantedBy=remote-fs.target
