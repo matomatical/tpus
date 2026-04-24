@@ -259,6 +259,31 @@ The web server logs to `/dev/shm/tpu-heartbeat-web.log` (tmpfs) rather than
 disk to avoid ext4 journal contention when training jobs are writing heavily.
 Install the logrotate config to cap the log size (see logrotate section below).
 
+Installing user handbook
+------------------------
+
+`user-handbook.md` is deployed to `/usr/local/share/doc/tpus/user-handbook.md`
+on each VM (FHS-standard location for locally-installed documentation). This
+gives every user a stable, absolute path to reference from their shell
+profile, `CLAUDE.md`, etc. — stable across home-dir migrations and not
+dependent on whether they've cloned this repo.
+
+Mode 644 owned by `root:root`: world-readable, only admin can modify. Per-VM
+install (not `/storage`) so it survives a JuiceFS outage.
+
+```
+for t in 0 1 2 3; do
+  scp user-handbook.md tpu$t:
+  ssh tpu$t 'sudo install -d -m 755 /usr/local/share/doc/tpus && sudo install -m 644 ~/user-handbook.md /usr/local/share/doc/tpus/user-handbook.md && rm ~/user-handbook.md'
+done
+```
+
+**Keep in sync:** when you edit `user-handbook.md` in this repo, re-run the
+loop above so the deployed copies match. The checked-in version is the source
+of truth; `/usr/local/share/doc/tpus/user-handbook.md` is a deployment
+artifact, not an editing target. (`admin-handbook.md` is *not* deployed —
+it's admin-only and lives in the repo.)
+
 Adding new users
 ----------------
 

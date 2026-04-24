@@ -81,6 +81,8 @@ April 2026, backend stability improvements:
   TOCTOU race)
 * [x] Configure automatic 14-day `/tmp` age-based cleanup.
 * [x] Silence `rsyslog` `/dev/console` omfile suspension spam.
+* [x] Deploy `user-handbook.md` to `/usr/local/share/doc/tpus/` on each VM
+  for stable reference from user shells / CLAUDE.md files.
 
 Major feature: Persistent shared storage
 
