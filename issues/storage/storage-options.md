@@ -296,8 +296,8 @@ concurrent load shows only ~5–10% per-node slowdown — Redis is nowhere
 near saturation. Full results in
 [`juicefs-benchmark-results.md`](juicefs-benchmark-results.md).
 
-Mount path decision: **`/storage`** for production, `/jfs` was used
-for benchmarking and can be retired once we switch over.
+Mount path decision: **`/storage`** for production. `/jfs` was used for
+benchmarking and was retired on 2026-04-24 when `storage.mount` went live.
 
 
 ### Architecture
@@ -407,14 +407,17 @@ Cache size rationale: 40 GB cache + ~25 GB system + ~10 GB safety margin +
 
 #### Systemd unit (each node, for production)
 
-Create symlink for mount helper:
+Create symlink for the FUSE mount helper. The PPA installs the binary at
+`/usr/bin/juicefs` (not `/usr/local/bin/juicefs`, which is where the curl
+installer drops it); `mount(8)` looks up `/sbin/mount.juicefs` as the helper:
 ```bash
-sudo ln -s /usr/local/bin/juicefs /sbin/mount.juicefs
+sudo ln -sfn /usr/bin/juicefs /sbin/mount.juicefs
 ```
 
-Create `/etc/systemd/system/storage.mount` (systemd derives the unit
-name from the mount point, so a different mount point needs a different
-unit filename):
+Create `/etc/systemd/system/storage.mount` with mode `0600 root:root` (the
+file contains the Redis password — don't let non-admin users read
+`/etc/systemd/system/`). systemd derives the unit name from the mount point,
+so a different mount point needs a different unit filename:
 ```ini
 [Unit]
 Description=JuiceFS cluster storage
@@ -425,14 +428,18 @@ After=network-online.target
 What=redis://:PASSWORD@tpu0:6379/0
 Where=/storage
 Type=juicefs
-Options=_netdev,allow-other,cache-dir=/var/jfsCache,cache-size=40960,buffer-size=600,writeback,upload-delay=1m
+Options=_netdev,allow_other,cache-dir=/var/jfsCache,cache-size=40960,buffer-size=600,writeback,upload-delay=1m
 
 [Install]
 WantedBy=remote-fs.target
 WantedBy=multi-user.target
 ```
 
-Note: for tpu0, add `After=redis-server.service` to the unit.
+Note: the FUSE option is `allow_other` (underscore), not `allow-other`.
+
+For tpu0 only, add a drop-in at `/etc/systemd/system/storage.mount.d/redis.conf`
+(mode `0644`) that orders the mount after `redis-server.service`. Other nodes
+reach Redis over the network and need only the shared unit.
 
 ```bash
 sudo systemctl daemon-reload
@@ -652,12 +659,10 @@ The critical risk is Redis data loss. Mitigations:
 1. **[done]** Install and format (all nodes).
 2. **[done]** Run benchmarks, validate acceptable performance. See
    [`juicefs-benchmark-results.md`](juicefs-benchmark-results.md).
-3. **[next]** Mount at `/storage` via systemd on all nodes. Currently
-   only a manual `/jfs` mount is running on all 4 nodes from the
-   benchmark phase; to switch, unmount `/jfs` and bring up the
-   `storage.mount` unit instead. (Both mounts hit the same Redis +
-   GCS backend so data is identical — this is a mount-point rename,
-   not a migration.)
+3. **[done]** Mount at `/storage` via systemd on all nodes (2026-04-24).
+   The manual `/jfs` mounts from the benchmark phase were unmounted the
+   same day after validating `/storage` worked (same Redis + GCS backend,
+   so no data migration).
 4. Create `/storage/home/<user>` directories.
 5. Migrate user data to `/storage/home/<user>/`.
 6. Update user home directories:
@@ -740,9 +745,9 @@ small test transfer.
 * **Hybrid checkpointing**: Not needed initially. If models grow past a few
   GB, write checkpoints directly to `gs://` via JAX/Orbax to avoid cache
   thrashing. Revisit later.
-* **Mount path**: `/storage` for production. `/jfs` was used for the
-  benchmark mounts (same Redis + GCS backend, just a different mount
-  point) and will be retired once `storage.mount` is live.
+* **Mount path**: `/storage` for production (live via `storage.mount`
+  systemd unit on all 4 nodes as of 2026-04-24). `/jfs` was retired the
+  same day once `/storage` was validated.
 
 ### Open questions
 

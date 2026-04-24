@@ -704,9 +704,9 @@ the full design rationale.
 Architecture:
 
 ```
-tpu0 ──┐                              ┌── Redis (metadata, on tpu0)
-tpu1 ──┤── juicefs mount at /jfs ─────┤
-tpu2 ──┤   (FUSE client on each VM)   └── gs://mfrs-tpu-cluster (data, GCS)
+tpu0 ──┐                                  ┌── Redis (metadata, on tpu0)
+tpu1 ──┤── juicefs mount at /storage ─────┤
+tpu2 ──┤   (FUSE client on each VM)       └── gs://mfrs-tpu-cluster (data, GCS)
 tpu3 ──┘
          each VM also has a local
          cache dir on its boot disk
@@ -857,6 +857,61 @@ done
 ```
 
 Currently installed on: tpu1, tpu2, tpu3.
+
+### Mount JuiceFS at `/storage` (all nodes)
+
+The cluster filesystem is mounted at `/storage` via a systemd `.mount` unit on
+each node. Data lives in Redis+GCS; the mount point is just the POSIX view.
+
+The unit file `conf/storage.mount` keeps `PASSWORD` as a literal placeholder in
+the repo (safe to commit). At deploy time, substitute `$REDIS_PASSWORD` from
+`secrets/redis.env` and install the unit with mode `0600 root:root` so
+non-admin users can't read the Redis password from `/etc/systemd/system/`.
+
+The FUSE mount helper is discovered by `mount(8)` at `/sbin/mount.juicefs`. The
+PPA-installed binary lives at `/usr/bin/juicefs`, so the helper symlink points
+there. (On Ubuntu 22.04 `/sbin` is already a symlink to `usr/sbin`, so one
+symlink covers both lookup paths.)
+
+Install mount helper, mount point, and unit file on every node:
+
+```
+for t in 0 1 2 3; do
+  scp conf/storage.mount tpu$t:
+  ssh tpu$t 'bash -s' <<'REMOTE'
+    set -euo pipefail
+    source ~/tpus/secrets/redis.env
+    umask 077
+    sed "s|PASSWORD|$REDIS_PASSWORD|" ~/storage.mount > ~/storage.mount.real
+    sudo install -m 0600 -o root -g root ~/storage.mount.real /etc/systemd/system/storage.mount
+    rm ~/storage.mount ~/storage.mount.real
+    sudo ln -sfn /usr/bin/juicefs /sbin/mount.juicefs
+    sudo mkdir -p /storage
+REMOTE
+done
+```
+
+On tpu0 only, install a drop-in that orders the mount after `redis-server.service`
+(the other nodes reach Redis over the network and need only the shared unit):
+
+```
+sudo mkdir -p /etc/systemd/system/storage.mount.d
+sudo install -m 0644 -o root -g root conf/storage.mount.d-redis.conf \
+    /etc/systemd/system/storage.mount.d/redis.conf
+```
+
+Reload systemd and enable the mount on every node:
+
+```
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo systemctl daemon-reload && sudo systemctl enable --now storage.mount'
+done
+```
+
+Verify: `mount | grep /storage` on each node shows
+`JuiceFS:clusterhome on /storage type fuse.juicefs`. Non-root
+`systemctl cat storage.mount` should return permission denied, since the
+password is in the unit file and only root can read it.
 
 TODO: Job management
 --------------------

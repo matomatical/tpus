@@ -90,7 +90,8 @@ Major feature: Persistent shared storage
 * [x] Create bucket, install and configure JuiceFS
 * [x] Run benchmarks and validate acceptable performance
   (see issues/storage/juicefs-benchmark-results.md)
-* [ ] Mount and port user home directories
+* [x] Mount `/storage` via systemd on all 4 nodes.
+* [ ] Port user home directories to `/storage/home/`.
 * [ ] Set up monitoring of health, cache size, and cost
 
 Major feature: TPU queueing system (prerequisite, persistent shared storage)

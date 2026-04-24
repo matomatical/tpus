@@ -1,0 +1,14 @@
+[Unit]
+Description=JuiceFS cluster storage
+Requires=network-online.target
+After=network-online.target
+
+[Mount]
+What=redis://:PASSWORD@tpu0:6379/0
+Where=/storage
+Type=juicefs
+Options=_netdev,allow_other,cache-dir=/var/jfsCache,cache-size=40960,buffer-size=600,writeback,upload-delay=1m
+
+[Install]
+WantedBy=remote-fs.target
+WantedBy=multi-user.target
