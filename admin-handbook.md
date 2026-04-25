@@ -237,6 +237,7 @@ for t in 0 1 2 3; do
   ssh tpu$t 'sudo ln -sf /home/shared/tpu-usage.py /usr/local/bin/tpu-usage'
   ssh tpu$t 'sudo ln -sf /home/shared/tpu-heatmap.py /usr/local/bin/tpu-heatmap'
   ssh tpu$t 'sudo ln -sf /home/shared/tpu-health.py /usr/local/bin/tpu-health'
+  ssh tpu$t 'sudo ln -sf /home/shared/tpu-warmup.sh /usr/local/bin/tpu-warmup'
 done
 ```
 

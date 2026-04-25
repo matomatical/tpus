@@ -588,52 +588,135 @@ wait
 
 ### Monitoring and maintenance plan
 
-#### Day-to-day monitoring
+Posture: keep monitoring lightweight. Passive checks surfaced via `tpu-health`
+(which already runs on every SSH login via MOTD), plus cron-based maintenance
+with email-on-failure. No time-series storage and no Prometheus/Grafana for
+now — defer until we hit an issue we need a time-series view to investigate.
+Each JuiceFS client does expose Prometheus metrics at `localhost:9567/metrics`,
+which we can scrape ad-hoc for point-in-time signals; if we later want a
+proper dashboard, JuiceFS ships a Grafana dashboard template we can drop in.
+
+#### Ad-hoc inspection commands
+
+For interactive debugging — not part of any cron or `tpu-health` script:
 
 ```bash
-# Quick check: real-time stats (cache hits, metadata latency, GCS ops)
+# Real-time stats: cache hits, metadata latency, GCS ops
 juicefs stats /storage
 
-# Check connected clients and filesystem info
-juicefs status redis://:${REDIS_PASSWORD}@tpu0:6379/0
+# Connected clients and filesystem info (admin-only — needs Redis password)
+source /etc/juicefs/redis.env
+juicefs status "redis://:${META_PASSWORD}@tpu0:6379/0"
+# or, password-free via env var:
+META_PASSWORD=$(. /etc/juicefs/redis.env && echo "$META_PASSWORD") \
+  juicefs status redis://tpu0:6379/0
 
-# Check fragmentation on a specific file
+# Slice fragmentation on a specific file
 juicefs info /storage/path/to/file
 
-# Redis memory usage
-redis-cli -a <password> INFO memory | grep used_memory_human
+# Redis memory and key count
+source ~/tpus/secrets/redis.env
+redis-cli -a "$REDIS_PASSWORD" INFO memory | grep used_memory_human
+redis-cli -a "$REDIS_PASSWORD" DBSIZE
 ```
 
-Each JuiceFS client exposes Prometheus metrics at `http://localhost:9567/metrics`.
-Key metrics to watch:
+Key Prometheus metrics at `localhost:9567/metrics` worth knowing about:
+
 * `juicefs_blockcache_hits` / `juicefs_blockcache_miss` — cache hit rate
+* `juicefs_blockcache_bytes` / `juicefs_blockcache_evicts` — cache pressure
 * `juicefs_meta_ops_durations_histogram_seconds` — metadata latency
-* `juicefs_object_request_errors` — GCS errors
+* `juicefs_object_request_errors` — GCS errors (used by `tpu-health`)
+* `juicefs_object_request_durations_histogram_seconds` — GCS latency
 
-Setting up Prometheus/Grafana is optional but JuiceFS provides a dashboard
-template if we want it later.
+#### Real-time checks (extending `tpu-health`)
 
-#### Scheduled maintenance
+Per-VM signals to add to `tpu-health` (so they show up in MOTD on login). All
+point-in-time, no time series:
 
-| Frequency | Task                                              |
-|-----------|---------------------------------------------------|
-| Automatic | Metadata backup to GCS (hourly, by JuiceFS client)|
-| Daily     | `juicefs dump` to local backup (cron on tpu0)     |
-| Weekly    | `juicefs gc --compact` (defragment slices)         |
-| Monthly   | `juicefs gc --delete` (clean orphaned GCS objects, run manually at first) |
-| Monthly   | `juicefs fsck` (consistency check)                 |
+* **Mount alive**: `/storage` shows in `mount` and `stat /storage` returns
+  promptly (don't hang).
+* **Cache utilisation**: `du -sb /var/jfsCache` vs the 40 GB cap. WARN at 90% —
+  but expect the cache to live near 100% in steady state, that's normal LRU
+  behaviour, so this is mostly a sanity check.
+* **FS capacity**: parse `df /storage` for used/1000 GiB. WARN at 80%.
+* **Rawstaging backlog**: `du -sb /var/jfsCache/<volume-uuid>/rawstaging` —
+  if `--writeback` queued bytes can't reach GCS, this grows without bound.
+  WARN at 1 GB, CRIT at 10 GB. This is the signal that would have caught the
+  metadata-server-OAuth-scope bug earlier.
+* **GCS error counter delta**: scrape `juicefs_object_request_errors` from
+  `localhost:9567/metrics` and compare against the previous sample (stash on
+  disk between runs). Non-zero growth → CRIT.
+* **Redis liveness** (tpu0 only, admin-only path): `redis-cli -a "$REDIS_PASSWORD" ping`.
+  Password lives in `/etc/juicefs/redis.env` (root-only), so this check goes
+  in a separate admin-only script (e.g. `tpu-storage-admin`) rather than in
+  user-visible `tpu-health`.
 
-Daily metadata dump cron (on tpu0):
-```cron
-0 3 * * * /usr/local/bin/juicefs dump \
-  redis://:PASSWORD@localhost:6379/0 \
-  /var/backups/juicefs-meta-$(date +\%Y\%m\%d).json.gz
+#### Backups (disaster recovery)
+
+Two destinations, both cheap:
+
+1. **tpu0 boot disk**, `/var/backups/juicefs/`. Daily `juicefs dump | gzip >
+   <date>.json.gz`, 5-day rotation. Survives loss of `/storage` (Redis death,
+   GCS auth break, network partition) since it lives on the local disk.
+2. **GCS bucket, `backups/` prefix**, outside the `clusterhome/` JuiceFS
+   keyspace. Uploaded periodically (cadence TBD — likely hourly since the
+   dump is small). Lifecycle rule deletes after 90d. Survives loss of tpu0
+   boot disk.
+
+Both destinations use the existing `tpu-juicefs@` SA. We considered a
+separate write-only SA scoped to `backups/` via IAM Conditions for defense
+against credential compromise, but decided against the extra moving parts —
+the threat model is clumsy users / drifting agents, not credential theft.
+
+Backup size baseline (2026-04-25): 1.79 M Redis keys, 470 MB raw dump,
+**41 MB gzipped**. Grows with file count, so revisit if we see substantial
+growth. At 41 MB × hourly × 30 days = ~30 GB/month in GCS = ~$0.60/mo at
+standard storage; 5 days × 41 MB = ~200 MB on tpu0 boot disk. Both negligible.
+
+The exact cadence is TBD — we'll settle once the cron runs against a live
+metadata snapshot and we see how long the dump actually takes.
+
+#### Cache warmup
+
+JuiceFS only auto-warms on read, and the LRU cache evicts cold data over
+time. Boot-time warmup doesn't fit our cluster (TPU VMs don't reboot, so the
+trigger basically never fires); periodic re-warm just fights LRU. So instead
+of automation, expose an on-demand wrapper:
+
+```
+tpu-warmup [PATH ...]      # warm PATH(s) on this node (default: $PWD)
+tpu-warmup -n tpuN PATH    # warm PATH on a different node via SSH
 ```
 
-Weekly GC cron (on tpu0):
-```cron
-0 4 * * 0 /usr/local/bin/juicefs gc redis://:PASSWORD@localhost:6379/0 --compact
-```
+Wraps `juicefs warmup <path> --threads 4` with progress and a sanity check
+that the path lives under `/storage`. Lives in `shared-scripts/`, deployed
+cluster-wide. Workflow: install/update a venv on `/storage`, then
+`tpu-warmup -n tpuN ./venv` before launching on `tpuN`.
+
+User handbook gets a one-line tip pointing at this for the
+"just-installed-a-venv" case.
+
+#### Maintenance crons (tpu0 only)
+
+| Frequency | Task                                                      |
+|-----------|-----------------------------------------------------------|
+| Daily     | `juicefs dump` → boot-disk backup, 5-day rotation         |
+| Hourly*   | Push latest dump → `gs://mfrs-tpu-cluster/backups/`       |
+| Weekly    | `juicefs gc --compact` (defragment slices)                |
+| Manual    | `juicefs gc --delete` (until we trust it; first few runs) |
+| Manual    | `juicefs fsck` (consistency check)                        |
+
+\* Cadence TBD; revisit after observing dump duration in practice.
+
+All crons mail their stderr to the admin on failure (`MAILTO=` in the
+crontab). The dump invocation must source `/etc/juicefs/redis.env` and pass
+the password via `META_PASSWORD` env var rather than embedding it in the
+Redis URL — same reasoning as the `storage.mount` unit (keeps password out
+of `ps`/argv).
+
+A wrapper script `/usr/local/sbin/juicefs-backup.sh` (root-owned, mode
+0750) handles the env sourcing and calls `juicefs dump`; the cron just
+invokes the wrapper.
 
 #### Failure modes and recovery
 
@@ -674,13 +757,20 @@ The critical risk is Redis data loss. Mitigations:
 6. Update user home directories:
    `sudo usermod -d /storage/home/<user> <user>`.
    (Admin account `matt` stays at `/home/matt` for recovery access.)
-7. Set up monitoring crons on tpu0.
-8. Warm up each node's cache after mount: `juicefs warmup` on migrated
-   venvs. The benchmark showed cold imports take 30+ seconds for JAX and
-   5+ minutes for PyTorch/XLA, so ideally automate this via a
-   `juicefs-warmup.service` oneshot that runs after `storage.mount` on
-   each boot. Targets: any `venv/` directory under `/storage/home/`.
-9. Observe for a week before considering any changes to boot disk usage.
+7. Deploy `tpu-warmup` (`shared-scripts/tpu-warmup.{sh,py}`) for on-demand
+   cache warmup. The benchmark showed cold imports take 30+ seconds for
+   JAX and 5+ minutes for PyTorch/XLA. Originally we considered a
+   `juicefs-warmup.service` oneshot at boot, but TPU VMs don't reboot, so
+   the trigger never fires; LRU eviction happens during runtime, so an
+   on-demand wrapper is the right fit instead. See "Cache warmup" above.
+8. Extend `tpu-health` with the storage signals listed in "Real-time
+   checks" above; add a separate admin-only `tpu-storage-admin` for the
+   Redis ping (which needs the password).
+9. Set up the maintenance crons on tpu0 (daily dump → boot disk, hourly
+   push → GCS `backups/`, weekly `gc --compact`). Lifecycle rule on
+   `gs://mfrs-tpu-cluster/backups/` to delete after 90d. `MAILTO=` set so
+   failures email the admin.
+10. Observe for a week before considering any changes to boot disk usage.
 
 ### Cost estimate
 
@@ -767,6 +857,16 @@ small test transfer.
   it in a cron job, to verify it's not deleting anything unexpected. Running
   `juicefs gc` without `--delete` is already a check-only scan (there is no
   `--dry-run` flag).
+* **Backup cadence**: Hourly to GCS is the working assumption, but TBD until
+  we see how long `juicefs dump` takes against a larger snapshot and what
+  the GCS Class A op cost looks like in practice. Daily-to-boot-disk with
+  5-day rotation is settled.
+* **`tpu-storage-admin` placement**: Standalone admin-only script in
+  `admin-scripts/`, or a `--admin` flag on a broader `tpu-storage` command?
+  Decide when we implement.
+* **Prometheus + Grafana**: Deferred. Revisit if we hit an issue that needs
+  a time-series view, or as part of the "pixel-art dashboard" roadmap item.
+  JuiceFS ships a Grafana dashboard JSON we can use as a starting point.
 
 Technical notes
 ---------------

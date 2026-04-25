@@ -248,6 +248,18 @@ However, there are some quirks:
   should be fast (unless the cache gets full, in which case you need to wait
   again).
 
+  If you've just installed or updated a venv (or any other large directory)
+  and you're about to launch a job on a different VM, you can pre-warm that
+  VM's cache so the first run isn't slow:
+
+  ```
+  tpu-warmup -n tpuN ./venv      # warm ./venv on tpuN via SSH
+  tpu-warmup ./venv              # warm on the current VM
+  tpu-warmup --check ./venv      # just report whether it's cached
+  ```
+
+  Run `tpu-warmup -h` for the full options. Paths must be on `/storage`.
+
 This is a new set-up and there might be teething issues---reach out if you
 experience undue filesystem lag or other issues.
 
