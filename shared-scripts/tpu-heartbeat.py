@@ -94,6 +94,7 @@ def get_device_status():
     """
     Checks /sys/class/accel for TPU usage.
     """
+    # First pass: read kernel state per device.
     devices = []
     for dev_id, path in enumerate(DEVICES):
         status = {
@@ -104,34 +105,41 @@ def get_device_status():
             "time": "-",
             "command": "-"
         }
-
-        # Check ownership
         with open(os.path.join(path, 'is_device_owned')) as f:
             is_owned = f.read().strip() == '1'
-
         if is_owned:
             status["state"] = "BUSY"
-            
             with open(os.path.join(path, 'device_owner')) as f:
-                pid = f.read().strip()
-            status["pid"] = pid
-
-            try:
-                # user, elapsed time, command
-                out = subprocess.check_output(
-                    ['ps', '-p', pid, '-o', 'user=,etime=,args='], 
-                    text=True,
-                ).strip()
-                parts = out.split(None, 2)
-                if len(parts) >= 3:
-                    status["user"] = parts[0]
-                    status["time"] = parts[1]
-                    status["command"] = parts[2]
-            except subprocess.CalledProcessError:
-                status["pid"] = f"{pid}"
-                status["state"] = "EXIT"
+                status["pid"] = f.read().strip()
         devices.append(status)
-    
+
+    # Second pass: one batched `ps` for all owning pids, then merge results.
+    busy_pids = [d["pid"] for d in devices if d["state"] == "BUSY"]
+    ps_info = {}
+    if busy_pids:
+        try:
+            out = subprocess.check_output(
+                ['ps', '-p', ','.join(busy_pids),
+                 '-o', 'pid=,user=,etime=,args='],
+                text=True,
+            )
+            for line in out.splitlines():
+                parts = line.split(None, 3)
+                if len(parts) >= 4:
+                    ps_info[parts[0]] = (parts[1], parts[2], parts[3])
+        except subprocess.CalledProcessError:
+            # ps exits nonzero only when none of the pids exist; ps_info stays empty.
+            pass
+
+    for status in devices:
+        if status["state"] != "BUSY":
+            continue
+        info = ps_info.get(status["pid"])
+        if info is None:
+            status["state"] = "EXIT"
+        else:
+            status["user"], status["time"], status["command"] = info
+
     return devices
 
 

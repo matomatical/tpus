@@ -15,7 +15,7 @@ Canonical references:
 ## Repo layout
 
 - `admin-scripts/` — admin utilities run from the repo (not deployed):
-  `adduser.sh`, `setup-cluster-keys.sh`, `fetch-logs.sh`, `bench-*.py`.
+  `adduser.sh`, `fetch-logs.sh`, `bench-*.py`.
 - `shared-scripts/` — deployed to `/home/shared/` on each VM and symlinked
   into `/usr/local/bin/`: `tpu-device.sh`, `tpups.py`, `tpu-usage.py`,
   `tpu-heatmap.py`, `tpu-health.py`, `tpu-heartbeat.py`.

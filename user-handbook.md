@@ -82,6 +82,21 @@ You and other users *don't* have admin rights, and can't access each
 other's files unless you specifically set your permissions such that
 they can.
 
+**Command-line arguments of running processes are visible to other users**,
+both via standard Linux `ps` on the same VM, and via the cluster-wide `tpups`
+utility (see below). Therefore, don't pass secrets like API keys, tokens, or
+passwords as command-line flags. Use environment variables or read them from
+files with restrictive permissions (`chmod 600`) instead. For example:
+
+```
+# Bad: visible to every user via `ps` / `tpups`
+python train.py --wandb-api-key=sk-...
+
+# OK: secret kept in a 0600 file, only the value enters the env
+export WANDB_API_KEY=$(cat ~/.wandb-key)
+python train.py
+```
+
 Data safety
 -----------
 

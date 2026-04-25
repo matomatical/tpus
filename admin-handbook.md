@@ -328,21 +328,6 @@ VMs. For example:
 
 Remember to append the invocation to `users.md`.
 
-If for some reason you need to create a user on the per-VM boot disks
-(e.g. an admin account that must stay available when `/storage` is down),
-use `adduser-local.sh` instead. It creates a separate `/home/<username>`
-on each VM — the original pre-JuiceFS behaviour.
-
-To set up intra-cluster keys for an existing user (e.g. after re-provisioning):
-
-```
-./setup-cluster-keys.sh <username>
-```
-
-Note: `setup-cluster-keys.sh` still assumes per-VM homes at `/home/<u>`,
-so it currently only fits `adduser-local.sh`-style users (matt, ross).
-Shared-home users already get their cluster keys from `adduser.sh`.
-
 TPU logging permission
 ----------------------
 
@@ -504,8 +489,7 @@ for t in 0 1 2 3; do
 done
 ```
 
-Per-user cluster keys are set up automatically by `adduser.sh`. For existing
-users, use `setup-cluster-keys.sh`.
+Per-user cluster keys are set up automatically by `adduser.sh`.
 
 ### Trouble: Bad configuration option
 
