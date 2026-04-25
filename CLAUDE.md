@@ -42,6 +42,11 @@ for t in 0 1 2 3; do
 done
 ```
 
+The trailing-colon form (`tpu$t:`) is load-bearing — drops `<file>` in the
+remote home dir with the same basename. If you need an explicit destination
+filename, brace the variable (`tpu${t}:dest.name`); zsh treats `$t:t/h/r/e/...`
+as the pathname-modifier syntax and silently mangles the path otherwise.
+
 Files stage in `~/` (which is `drwxr-x---`), not `/tmp/`. `/tmp/` is
 world-writable and the `scp` → `sudo cp` pattern through it is vulnerable to
 a symlink TOCTOU race that lets another user inject content into `/etc/`
