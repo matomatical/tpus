@@ -95,8 +95,8 @@ Major feature: Persistent shared storage
 * [x] Mount `/storage` via systemd on all 4 nodes.
 * [x] Port user home directories to `/storage/home/`.
 * [x] `tpu-warmup` utility for on-demand cache warming on a chosen node.
-* [ ] Extend `tpu-health` with /storage signals (mount, cache, rawstaging,
-  GCS errors) and a separate admin-only Redis ping.
+* [x] Rewrite `tpu-health` as admin-only cluster-wide tool with /storage
+  signals (mount, capacity, cache, rawstaging, GCS errors) and Redis ping.
 * [ ] Daily `juicefs dump` to tpu0 boot disk + periodic push to GCS
   `backups/` prefix; weekly `gc --compact`.
 

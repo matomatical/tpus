@@ -221,14 +221,28 @@ for t in 0 1 2 3; do
 done
 ```
 
-From local to each TPU VM:
+From local to each TPU VM. Public scripts go in as `755 root:root`;
+`tpu-health` lands separately as `750 root:matt` so non-admin users can't
+read or execute it. Installing each with the right mode upfront avoids any
+window where the admin-only file is briefly world-readable in `/home/shared/`.
 
 ```
 for t in 0 1 2 3; do
   scp shared-scripts/* tpu$t:
-  ssh tpu$t 'sudo install -m 755 ~/tpu-*.sh ~/tpu-*.py ~/tpups.py /home/shared/ && rm ~/tpu-*.sh ~/tpu-*.py ~/tpups.py'
+  ssh tpu$t '
+    sudo install -m 755 \
+      ~/tpu-device.sh ~/tpu-warmup.sh ~/tpu-heartbeat.py \
+      ~/tpu-heatmap.py ~/tpu-usage.py ~/tpups.py \
+      /home/shared/
+    sudo install -m 750 -o root -g matt ~/tpu-health.py /home/shared/tpu-health.py
+    rm ~/tpu-*.sh ~/tpu-*.py ~/tpups.py
+  '
 done
 ```
+
+The `/usr/local/bin/tpu-health` symlink (created in the loop below) is still
+useful for `matt`'s PATH; the file mode at the symlink target is what
+enforces admin-only access.
 
 ```
 for t in 0 1 2 3; do

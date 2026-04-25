@@ -588,13 +588,13 @@ wait
 
 ### Monitoring and maintenance plan
 
-Posture: keep monitoring lightweight. Passive checks surfaced via `tpu-health`
-(which already runs on every SSH login via MOTD), plus cron-based maintenance
+Posture: keep monitoring lightweight. Admin-only `tpu-health` gives a
+cluster-wide table on demand (run from any node), plus cron-based maintenance
 with email-on-failure. No time-series storage and no Prometheus/Grafana for
 now — defer until we hit an issue we need a time-series view to investigate.
 Each JuiceFS client does expose Prometheus metrics at `localhost:9567/metrics`,
-which we can scrape ad-hoc for point-in-time signals; if we later want a
-proper dashboard, JuiceFS ships a Grafana dashboard template we can drop in.
+which `tpu-health` scrapes ad-hoc for point-in-time signals; if we later want
+a proper dashboard, JuiceFS ships a Grafana dashboard template we can drop in.
 
 #### Ad-hoc inspection commands
 
@@ -628,28 +628,35 @@ Key Prometheus metrics at `localhost:9567/metrics` worth knowing about:
 * `juicefs_object_request_errors` — GCS errors (used by `tpu-health`)
 * `juicefs_object_request_durations_histogram_seconds` — GCS latency
 
-#### Real-time checks (extending `tpu-health`)
+#### `tpu-health` checks
 
-Per-VM signals to add to `tpu-health` (so they show up in MOTD on login). All
-point-in-time, no time series:
+`tpu-health` is admin-only (mode `0750 root:matt` on `/home/shared/tpu-health.py`).
+Default invocation runs the checks on all 4 nodes in parallel via SSH and
+prints a compact table; `-l/--local` shows just the current node, sentence
+per check; `-n NODE` targets one node. All point-in-time, no time series.
 
-* **Mount alive**: `/storage` shows in `mount` and `stat /storage` returns
-  promptly (don't hang).
-* **Cache utilisation**: `du -sb /var/jfsCache` vs the 40 GB cap. WARN at 90% —
-  but expect the cache to live near 100% in steady state, that's normal LRU
-  behaviour, so this is mostly a sanity check.
-* **FS capacity**: parse `df /storage` for used/1000 GiB. WARN at 80%.
-* **Rawstaging backlog**: `du -sb /var/jfsCache/<volume-uuid>/rawstaging` —
-  if `--writeback` queued bytes can't reach GCS, this grows without bound.
+Per-VM signals:
+
+* **Mount alive**: `/storage` shows in `/proc/mounts` as `fuse.juicefs` and
+  `stat /storage/.config` returns promptly (2 s timeout — covers the Redis-down
+  freeze case without hanging the script).
+* **Cache utilisation**: `juicefs_blockcache_bytes` from `localhost:9567/metrics`
+  vs the `cache-size=` from `systemctl cat storage.mount`. Informational —
+  near-cap is normal LRU behaviour.
+* **FS capacity**: `df -B1 /storage`, used vs total. WARN at 80%, CRIT at 95%.
+  Total is whatever `--capacity` was passed to `juicefs format` (currently 1000 GiB)
+  and is read live, not hardcoded.
+* **Rawstaging backlog**: `juicefs_staging_block_bytes` (writeback queue depth).
   WARN at 1 GB, CRIT at 10 GB. This is the signal that would have caught the
   metadata-server-OAuth-scope bug earlier.
-* **GCS error counter delta**: scrape `juicefs_object_request_errors` from
-  `localhost:9567/metrics` and compare against the previous sample (stash on
-  disk between runs). Non-zero growth → CRIT.
-* **Redis liveness** (tpu0 only, admin-only path): `redis-cli -a "$REDIS_PASSWORD" ping`.
-  Password lives in `/etc/juicefs/redis.env` (root-only), so this check goes
-  in a separate admin-only script (e.g. `tpu-storage-admin`) rather than in
-  user-visible `tpu-health`.
+* **GCS errors**: `juicefs_object_request_errors` cumulative since mount.
+  Non-zero → WARN.
+* **Redis liveness**: `redis-cli -h tpu0 ping`, password supplied via
+  `REDISCLI_AUTH` env var (read from `/etc/juicefs/redis.env` via `sudo -n cat`).
+  `REDISCLI_AUTH` keeps the password out of `/proc/<pid>/cmdline` (mode 0444,
+  world-readable); `/proc/<pid>/environ` is 0400 owner-only. Runs from every
+  node — they all reach Redis on tpu0, so a per-node connectivity check
+  catches network-side issues too.
 
 #### Backups (disaster recovery)
 
@@ -757,15 +764,17 @@ The critical risk is Redis data loss. Mitigations:
 6. Update user home directories:
    `sudo usermod -d /storage/home/<user> <user>`.
    (Admin account `matt` stays at `/home/matt` for recovery access.)
-7. Deploy `tpu-warmup` (`shared-scripts/tpu-warmup.{sh,py}`) for on-demand
-   cache warmup. The benchmark showed cold imports take 30+ seconds for
-   JAX and 5+ minutes for PyTorch/XLA. Originally we considered a
-   `juicefs-warmup.service` oneshot at boot, but TPU VMs don't reboot, so
+7. **[done 2026-04-25]** Deploy `tpu-warmup` (`shared-scripts/tpu-warmup.sh`)
+   for on-demand cache warmup. The benchmark showed cold imports take 30+
+   seconds for JAX and 5+ minutes for PyTorch/XLA. Originally we considered
+   a `juicefs-warmup.service` oneshot at boot, but TPU VMs don't reboot, so
    the trigger never fires; LRU eviction happens during runtime, so an
    on-demand wrapper is the right fit instead. See "Cache warmup" above.
-8. Extend `tpu-health` with the storage signals listed in "Real-time
-   checks" above; add a separate admin-only `tpu-storage-admin` for the
-   Redis ping (which needs the password).
+8. **[done 2026-04-25]** Rewrite `tpu-health` as an admin-only cluster-wide
+   tool: tightened to mode `0750 root:matt`, default cluster table mode,
+   added storage signals (mount, capacity, cache, rawstaging, GCS errors),
+   and Redis ping included directly (admin-only file mode does the gating;
+   no separate `tpu-storage-admin` script needed).
 9. Set up the maintenance crons on tpu0 (daily dump → boot disk, hourly
    push → GCS `backups/`, weekly `gc --compact`). Lifecycle rule on
    `gs://mfrs-tpu-cluster/backups/` to delete after 90d. `MAILTO=` set so
@@ -861,9 +870,9 @@ small test transfer.
   we see how long `juicefs dump` takes against a larger snapshot and what
   the GCS Class A op cost looks like in practice. Daily-to-boot-disk with
   5-day rotation is settled.
-* **`tpu-storage-admin` placement**: Standalone admin-only script in
-  `admin-scripts/`, or a `--admin` flag on a broader `tpu-storage` command?
-  Decide when we implement.
+* ~~**`tpu-storage-admin` placement**~~: Resolved — folded directly into
+  `tpu-health` and gated via filesystem permissions on the script
+  (`0750 root:matt`). No separate utility needed.
 * **Prometheus + Grafana**: Deferred. Revisit if we hit an issue that needs
   a time-series view, or as part of the "pixel-art dashboard" roadmap item.
   JuiceFS ships a Grafana dashboard JSON we can use as a starting point.
