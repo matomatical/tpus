@@ -13,6 +13,7 @@ Restricted to admin via filesystem permissions on /home/shared/tpu-health.py
 
 import argparse
 import concurrent.futures
+import datetime as dt
 import json
 import os
 import re
@@ -211,6 +212,85 @@ def check_gcs_errors(metrics):
     return "OK", "0", "no GCS errors since mount"
 
 
+BACKUP_TIMER_UNIT = "/etc/systemd/system/juicefs-backup.timer"
+BACKUP_NAME_RE = re.compile(r"^dump-(\d{8}T\d{6}Z)\.json\.gz$")
+
+
+def check_backup_timer():
+    """juicefs-backup.timer active and last service run succeeded.
+
+    Only runs on the node where the backup is deployed (tpu0). Other nodes
+    see SKIP."""
+    if not os.path.exists(BACKUP_TIMER_UNIT):
+        return "SKIP", "n/a", "backup timer (not deployed on this node)"
+    try:
+        r = subprocess.run(
+            ["systemctl", "is-active", "juicefs-backup.timer"],
+            capture_output=True, text=True, timeout=3,
+        )
+        active = r.stdout.strip() or "unknown"
+        if active != "active":
+            return "CRIT", active, f"backup timer is {active!r}"
+        r2 = subprocess.run(
+            ["systemctl", "show", "juicefs-backup.service",
+             "-p", "Result", "-p", "ActiveEnterTimestamp"],
+            capture_output=True, text=True, timeout=3,
+        )
+        result = {}
+        for line in r2.stdout.splitlines():
+            k, _, v = line.partition("=")
+            result[k] = v
+        last_result = result.get("Result", "")
+        if last_result not in ("success", ""):
+            return "CRIT", last_result or "?", \
+                f"backup last result: {last_result!r}"
+        return "OK", "active", "backup timer active, last run ok"
+    except Exception as e:
+        return "CRIT", "error", f"backup timer check error: {e}"
+
+
+def check_backup_freshness():
+    """Newest dump in gs://.../backups/ is recent enough.
+
+    Only runs on the backup node (tpu0). Reads /etc/rclone/juicefs-backup.conf
+    via sudo -n; requires admin sudo (which tpu-health users have)."""
+    if not os.path.exists(BACKUP_TIMER_UNIT):
+        return "SKIP", "n/a", "backup freshness (not on backup node)"
+    try:
+        r = subprocess.run(
+            ["sudo", "-n", "rclone",
+             "--config=/etc/rclone/juicefs-backup.conf",
+             "lsf", "--files-only",
+             "gcs:mfrs-tpu-cluster/backups/"],
+            capture_output=True, text=True, timeout=15,
+        )
+    except subprocess.TimeoutExpired:
+        return "CRIT", "timeout", "backup freshness rclone lsf timed out"
+    except Exception as e:
+        return "CRIT", "error", f"backup freshness error: {e}"
+    if r.returncode != 0:
+        err = r.stderr.strip().splitlines()[-1] if r.stderr.strip() else "rclone failed"
+        return "CRIT", "list fail", f"backup list failed: {err}"
+    names = [n.strip() for n in r.stdout.splitlines()
+             if BACKUP_NAME_RE.match(n.strip())]
+    if not names:
+        return "CRIT", "none", "no backups in gs://.../backups/"
+    names.sort(reverse=True)
+    newest = names[0]
+    m = BACKUP_NAME_RE.match(newest)
+    ts = dt.datetime.strptime(m.group(1), "%Y%m%dT%H%M%SZ") \
+        .replace(tzinfo=dt.timezone.utc)
+    age_h = (dt.datetime.now(dt.timezone.utc) - ts).total_seconds() / 3600
+    if age_h >= 6:
+        status = "CRIT"
+    elif age_h >= 2:
+        status = "WARN"
+    else:
+        status = "OK"
+    return status, f"{age_h:.1f}h", \
+        f"newest backup {age_h:.1f}h old ({newest}); {len(names)} kept"
+
+
 def check_redis_ping():
     """Ping Redis on tpu0. Reads password from /etc/juicefs/redis.env via sudo,
     passes to redis-cli via REDISCLI_AUTH env var (not `-a`, which would expose
@@ -347,6 +427,8 @@ def _build_check_list(metrics, cache_cap):
         ("rawstaging",  lambda: check_rawstaging(metrics)),
         ("GCS errors",  lambda: check_gcs_errors(metrics)),
         ("redis",       check_redis_ping),
+        ("bk timer",    check_backup_timer),
+        ("bk fresh",    check_backup_freshness),
     ]
 
 

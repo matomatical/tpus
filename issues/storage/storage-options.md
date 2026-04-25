@@ -660,28 +660,63 @@ Per-VM signals:
 
 #### Backups (disaster recovery)
 
-Two destinations, both cheap:
+What we back up: **Redis metadata only**, via `juicefs dump | gzip`. The
+file *data* lives in GCS as immutable chunks under `clusterhome/` and is
+already durably replicated by Google. Metadata is the single point of
+failure — without it the chunks become unreadable as a filesystem.
 
-1. **tpu0 boot disk**, `/var/backups/juicefs/`. Daily `juicefs dump | gzip >
-   <date>.json.gz`, 5-day rotation. Survives loss of `/storage` (Redis death,
-   GCS auth break, network partition) since it lives on the local disk.
-2. **GCS bucket, `backups/` prefix**, outside the `clusterhome/` JuiceFS
-   keyspace. Uploaded periodically (cadence TBD — likely hourly since the
-   dump is small). Lifecycle rule deletes after 90d. Survives loss of tpu0
-   boot disk.
+**Destination**: a single GCS prefix, `gs://mfrs-tpu-cluster/backups/`,
+outside the `clusterhome/` JuiceFS keyspace. We considered also writing to
+the tpu0 boot disk for "GCS unavailable" scenarios, but the recovery path
+already requires GCS access (to read the chunks), so the boot-disk copy
+adds operational moving parts without a real failure mode it covers.
+Uses the existing `tpu-juicefs@` SA (`roles/storage.objectUser` is bucket-
+wide, so writing to `backups/` needs no IAM change). Considered a separate
+write-only SA scoped to `backups/` via IAM Conditions for defense against
+credential compromise but rejected — extra moving parts; threat model is
+clumsy users / drifting agents, not credential theft.
 
-Both destinations use the existing `tpu-juicefs@` SA. We considered a
-separate write-only SA scoped to `backups/` via IAM Conditions for defense
-against credential compromise, but decided against the extra moving parts —
-the threat model is clumsy users / drifting agents, not credential theft.
+**Cadence**: hourly. Dump time is ~38s (1.79 M keys → 470 MB raw →
+40 MB gzipped, baseline 2026-04-25); upload <1s. Total wall ~40s, fits
+comfortably under hourly. Cost: 15 backups × 41 MB ≈ 615 MB at
+standard storage = ~$0.012/month — negligible.
 
-Backup size baseline (2026-04-25): 1.79 M Redis keys, 470 MB raw dump,
-**41 MB gzipped**. Grows with file count, so revisit if we see substantial
-growth. At 41 MB × hourly × 30 days = ~30 GB/month in GCS = ~$0.60/mo at
-standard storage; 5 days × 41 MB = ~200 MB on tpu0 boot disk. Both negligible.
+**Retention**: tiered, "newest in each calendar bucket":
+- 8 hourly slots (UTC hours)
+- 4 daily slots (UTC days)
+- 3 weekly slots (7-day windows from the epoch)
 
-The exact cadence is TBD — we'll settle once the cron runs against a live
-metadata snapshot and we see how long the dump actually takes.
+Up to 15 distinct backups, ~3 weeks of coverage. Slot windows are
+calendar-aligned (not relative to "now"), so hourly backups straddling
+the hour boundary always end up in distinct slots — see
+`admin-scripts/juicefs-backup.py`. We deferred the `gs://.../backups/`
+GCS lifecycle rule (would have been "delete >180d") since the prune
+script is the primary mechanism and `tpu-health` will surface a runaway
+backup count if the prune ever stops working.
+
+**Implementation**: single Python script
+`/usr/local/sbin/juicefs-backup` (deployed from
+`admin-scripts/juicefs-backup.py`, root:root, mode 0750), shells out to
+`juicefs dump` + `gzip` + `rclone copy` (auth via SA-key in
+`/etc/rclone/juicefs-backup.conf`, set `bucket_policy_only = true` since
+the bucket has uniform bucket-level access). Triggered by
+`juicefs-backup.timer` + `.service` systemd units, hourly,
+`Persistent=true`. No mailer — failures show up via `tpu-health` (newest-
+backup freshness check, plus `juicefs-backup.timer` active status). If
+silent failures become a real problem we can add ntfy in a few lines.
+
+**Recovery procedure**:
+```
+# On tpu0, as root:
+. /etc/juicefs/redis.env; export META_PASSWORD
+rclone --config=/etc/rclone/juicefs-backup.conf cat \
+  gcs:mfrs-tpu-cluster/backups/dump-<TS>.json.gz \
+  | gunzip \
+  | juicefs load redis://tpu0:6379/0   # or a fresh Redis db
+juicefs fsck redis://tpu0:6379/0       # verify
+```
+Validated end-to-end on 2026-04-25: load took 33s, fsck reported 688K
+blocks / 662K slices / ~150 GB consistent, rc=0.
 
 #### Cache warmup
 
@@ -703,27 +738,19 @@ cluster-wide. Workflow: install/update a venv on `/storage`, then
 User handbook gets a one-line tip pointing at this for the
 "just-installed-a-venv" case.
 
-#### Maintenance crons (tpu0 only)
+#### Maintenance schedule (tpu0 only)
 
-| Frequency | Task                                                      |
-|-----------|-----------------------------------------------------------|
-| Daily     | `juicefs dump` → boot-disk backup, 5-day rotation         |
-| Hourly*   | Push latest dump → `gs://mfrs-tpu-cluster/backups/`       |
-| Weekly    | `juicefs gc --compact` (defragment slices)                |
-| Manual    | `juicefs gc --delete` (until we trust it; first few runs) |
-| Manual    | `juicefs fsck` (consistency check)                        |
+| Frequency | Task                                                      | Status                          |
+|-----------|-----------------------------------------------------------|---------------------------------|
+| Hourly    | `juicefs dump` → `gs://.../backups/`, tiered prune        | live (`juicefs-backup.timer`)   |
+| Weekly    | `juicefs gc --compact` (defragment slices)                | pending — next iteration        |
+| Manual    | `juicefs gc --delete` (until we trust it; first few runs) | pending — next iteration        |
+| Manual    | `juicefs fsck` (consistency check)                        | run as part of recovery testing |
 
-\* Cadence TBD; revisit after observing dump duration in practice.
-
-All crons mail their stderr to the admin on failure (`MAILTO=` in the
-crontab). The dump invocation must source `/etc/juicefs/redis.env` and pass
-the password via `META_PASSWORD` env var rather than embedding it in the
-Redis URL — same reasoning as the `storage.mount` unit (keeps password out
-of `ps`/argv).
-
-A wrapper script `/usr/local/sbin/juicefs-backup.sh` (root-owned, mode
-0750) handles the env sourcing and calls `juicefs dump`; the cron just
-invokes the wrapper.
+Scheduled tasks read `META_PASSWORD` from `/etc/juicefs/redis.env`
+(systemd `EnvironmentFile=` on services, manual `. /etc/juicefs/redis.env;
+export META_PASSWORD` for the wrapper script) — never embedded in the
+URL, since `/proc/<pid>/cmdline` is world-readable.
 
 #### Failure modes and recovery
 
@@ -737,9 +764,10 @@ invokes the wrapper.
 
 The critical risk is Redis data loss. Mitigations:
 1. AOF+RDB persistence on tpu0.
-2. Automatic hourly metadata backup to GCS (by JuiceFS).
-3. Daily `juicefs dump` cron.
-4. Redis data is tiny (<100 MB for our use case), so backups are fast.
+2. Hourly `juicefs dump` to `gs://.../backups/` with tiered retention
+   (8 hourly + 4 daily + 3 weekly slots, ~3-week coverage). See the
+   "Backups" subsection above for the full design.
+3. Recovery procedure validated end-to-end (`juicefs load` + `fsck`).
 
 #### Security
 

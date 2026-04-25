@@ -98,8 +98,9 @@ Major feature: Persistent shared storage
 * [x] `tpu-warmup` utility for on-demand cache warming on a chosen node.
 * [x] Rewrite `tpu-health` as admin-only cluster-wide tool with /storage
   signals (mount, capacity, cache, rawstaging, GCS errors) and Redis ping.
-* [ ] Daily `juicefs dump` to tpu0 boot disk + periodic push to GCS
-  `backups/` prefix; weekly `gc --compact`.
+* [x] Validate and automate juicefs redis database backups.
+* [ ] Weekly `juicefs gc --compact`; first manual runs of `gc --delete`
+  and `fsck`.
 
 Major feature: TPU queueing system (prerequisite, persistent shared storage)
 

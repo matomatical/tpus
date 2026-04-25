@@ -991,6 +991,98 @@ Verify: `mount | grep /storage` on each node shows
 `redis://tpu0:6379/0` (no password). Non-root `cat /etc/juicefs/redis.env`
 should fail with permission denied.
 
+### Backups (tpu0 only)
+
+Hourly metadata-only backups: `juicefs dump | gzip` → `gs://mfrs-tpu-cluster/backups/`,
+with a tiered retention policy (8 hourly + 4 daily + 3 weekly slots,
+calendar-aligned, ~3-week coverage). Driven by a systemd timer on tpu0;
+status surfaced through `tpu-health` (`bk timer` and `bk fresh` rows).
+We do not back up file data — chunks live in GCS already and are
+durable; metadata in Redis is the single point of failure. See
+`issues/storage/storage-options.md` for design rationale.
+
+Components:
+
+- `admin-scripts/juicefs-backup.py` — the script. Deployed to
+  `/usr/local/sbin/juicefs-backup` (root:root, mode 0750). Pure stdlib
+  Python; shells out to `juicefs dump`, `gzip`, and `rclone`.
+- `conf/rclone-juicefs-backup.conf` — rclone GCS backend config.
+  Deployed to `/etc/rclone/juicefs-backup.conf` (root:root, mode 0640).
+  References the existing SA key at `/etc/juicefs/sa-private-key.json`;
+  `bucket_policy_only = true` is required because the bucket has uniform
+  bucket-level access (without it, rclone tries to set per-object ACLs
+  and gets HTTP 400).
+- `conf/juicefs-backup.service` + `conf/juicefs-backup.timer` —
+  hourly oneshot, `Persistent=true`. Deployed to
+  `/etc/systemd/system/`.
+
+Install rclone (apt `1.53.x` is fine; we only use stable `copy`/`lsf`/
+`deletefile` subcommands):
+
+```
+sudo apt install -y rclone
+```
+
+Deploy on tpu0:
+
+```
+# rclone config
+scp conf/rclone-juicefs-backup.conf tpu0:
+ssh tpu0 'sudo install -d -m 0755 /etc/rclone \
+       && sudo install -m 0640 -o root -g root \
+            ~/rclone-juicefs-backup.conf /etc/rclone/juicefs-backup.conf \
+       && rm ~/rclone-juicefs-backup.conf'
+
+# script
+scp admin-scripts/juicefs-backup.py tpu0:
+ssh tpu0 'sudo install -m 0750 -o root -g root \
+            ~/juicefs-backup.py /usr/local/sbin/juicefs-backup \
+       && rm ~/juicefs-backup.py'
+
+# systemd units
+scp conf/juicefs-backup.service conf/juicefs-backup.timer tpu0:
+ssh tpu0 'sudo install -m 0644 -o root -g root \
+            ~/juicefs-backup.service /etc/systemd/system/juicefs-backup.service \
+       && sudo install -m 0644 -o root -g root \
+            ~/juicefs-backup.timer   /etc/systemd/system/juicefs-backup.timer \
+       && rm ~/juicefs-backup.service ~/juicefs-backup.timer \
+       && sudo systemctl daemon-reload \
+       && sudo systemctl enable --now juicefs-backup.timer'
+```
+
+Verify:
+
+```
+sudo /usr/local/sbin/juicefs-backup       # one manual run; ~40s
+systemctl list-timers juicefs-backup.timer
+sudo rclone --config=/etc/rclone/juicefs-backup.conf \
+    lsl gcs:mfrs-tpu-cluster/backups/
+tpu-health                                # `bk fresh` row should be < 2h
+```
+
+#### Recovery from a metadata loss
+
+If the live Redis db is lost or corrupted, restore from the most recent
+dump in GCS. Run on tpu0:
+
+```
+. /etc/juicefs/redis.env; export META_PASSWORD
+LATEST=$(sudo rclone --config=/etc/rclone/juicefs-backup.conf \
+         lsf --files-only gcs:mfrs-tpu-cluster/backups/ | sort | tail -1)
+sudo rclone --config=/etc/rclone/juicefs-backup.conf cat \
+     "gcs:mfrs-tpu-cluster/backups/${LATEST}" \
+     | gunzip \
+     | juicefs load redis://tpu0:6379/0    # or a fresh Redis db for testing
+juicefs fsck redis://tpu0:6379/0
+```
+
+Caveat: `juicefs load` writes into whatever db you point it at. Use
+db 0 only if you've already lost or wiped it; otherwise direct it at a
+fresh db (e.g. db 15 for a test) and inspect first.
+
+End-to-end recovery test (validated 2026-04-25): load = 33s, fsck = 60s,
+rc=0, 688K blocks / 662K slices / ~150 GB consistent.
+
 ### Migrate a user's home to `/storage`
 
 One-time procedure per user, codified as `admin-scripts/migrate-home.sh
