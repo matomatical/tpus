@@ -1,14 +1,11 @@
-MFR's Tiny TPU Cluster — Handbook
-=================================
+# MFR's Tiny TPU Cluster — Handbook
 
 Welcome to my tiny little cluster! Let's do some cool research together!
 
 
-About the cluster
-=================
+# About the cluster
 
-Hardware
---------
+## Hardware
 
 The "cluster" is a collection of 4 virtual machines (VMs) running on Google
 Cloud. We call them by the following names:
@@ -45,8 +42,7 @@ The available storage is as follows:
 * All four VMs are also connected to a 1 TiB bulk storage virtual drive
   (JuiceFS running on Google Cloud Storage buckets), used for user files.
 
-Software
---------
+## Software
 
 The cluster runs Ubuntu 22.04. I can install arbitrary software. Non-default
 software installed already:
@@ -71,8 +67,7 @@ Let me know if you need something that isn't there. Except:
 The cluster supports both JAX and PyTorch/XLA for TPU workloads. See the setup
 sections below for each framework.
 
-Privacy and security
---------------------
+## Privacy and security
 
 I am an admin on all TPU nodes. **In principle, I can see anything you
 do or store on the node, including e.g. GitHub keys, passwords, API
@@ -97,8 +92,7 @@ export WANDB_API_KEY=$(cat ~/.wandb-key)
 python train.py
 ```
 
-Data safety
------------
+## Data safety
 
 **Do not treat the cluster as permanent storage for valuable data.** I
 sometimes have to destroy and recreate the cluster, and all data on the
@@ -115,8 +109,7 @@ if you have another copy elsewhere. For example:
 TODO: In future, I will implement ~daily backups of the shared storage part of
 the cluster. But this is not yet live.
 
-Creating an account
-===================
+# Creating an account
 
 To access the cluster, please follow these instructions:
 
@@ -144,11 +137,9 @@ At this point, you must wait for me to create your account on the TPU
 VMs. I will do this and then let you know to proceed to the next step.
 
 
-Getting started
-===============
+# Getting started
 
-Accessing the VMs via SSH
--------------------------
+## Accessing the VMs via SSH
 
 The best way to access the VMs is via SSH. To configure SSH to easily
 access the cluster, add the following lines to the text file
@@ -185,8 +176,7 @@ between VMs directly. From any VM, just use:
 ssh tpu2            # open a shell on tpu2
 ```
 
-Working with files
-------------------
+## Working with files
 
 There are several ways to transfer files to/from and edit files on the cluster.
 
@@ -237,8 +227,7 @@ git and push to GitHub regularly. If you generate important files on the VM,
 you should copy them to your local device or store them in git if they are not
 too large.
 
-Cluster storage
----------------
+## Cluster storage
 
 The good news is, your home directory `/storage/home/<username>` lives on the
 shared filesystem, which means once you get your files to one of the VMs, they
@@ -278,8 +267,7 @@ However, there are some quirks:
 This is a new set-up and there might be teething issues---reach out if you
 experience undue filesystem lag or other issues.
 
-Setting up GitHub
------------------
+## Setting up GitHub
 
 To authorise your account on the cluster you will have to configure each
 VM with some SSH keys which you also add to GitHub. You can follow the
@@ -311,8 +299,7 @@ the simpler steps below.
    Your home (and `.ssh/`) is shared across all 4 VMs, so this setup
    applies everywhere automatically.
 
-Setting up a virtual environment
---------------------------------
+## Setting up a virtual environment
 
 You will need a Python virtual environment to install your framework
 and other packages. Because your home directory is on shared storage,
@@ -365,11 +352,9 @@ PyTorch training script to use it. See the official
 or [this tutorial of mine](https://far.in.net/tpu-go-brrr)
 (the latter may be a bit out of date).
 
-Using the TPUs
-==============
+# Using the TPUs
 
-Checking TPU status
--------------------
+## Checking TPU status
 
 I set up a system so that everyone can see who is currently using the
 TPUs. From any node, simply run the command `tpups` (short for "**tpu**
@@ -423,8 +408,7 @@ Two related tools:
 I included these because I want you to feel encouraged to run a lot of
 experiments. Let's keep the TPUs warm!
 
-Hello, world!
--------------
+## Hello, world!
 
 Create a Python script called `hello.py` to verify your setup. Here are
 examples for each framework.
@@ -477,8 +461,7 @@ tpu-device 2 python hello.py
 
 Use `tpups` to check which devices are free before choosing one.
 
-Choosing a TPU device
----------------------
+## Choosing a TPU device
 
 Your shell is configured with default environment variables that target
 device 0 on the current VM. This means you can run TPU programs
@@ -501,11 +484,9 @@ testing, or when no TPU devices are free:
 tpu-device cpu python hello.py
 ```
 
-Policies
-========
+# Policies
 
-Sharing system resources
-------------------------
+## Sharing system resources
 
 The cluster is a shared resource between me and my students working on
 research projects. There is currently no centralised job scheduling
@@ -535,8 +516,7 @@ storage. Please be considerate with your usage. For example:
 To see what is currently happening on the TPUs, use standard tools like
 `htop` and see the `tpups` section above for TPU-specific monitoring.
 
-Reasonable uses
----------------
+## Reasonable uses
 
 The TPUs are graciously provided by the
 [TPU Research Cloud](https://sites.research.google/trc/about/) programme.
@@ -557,11 +537,9 @@ disruptive. Therefore:
   but please ask me first.
 
 
-Advanced
-========
+# Advanced
 
-What is `tpu-device`?
----------------------
+## What is `tpu-device`?
 
 The cluster is configured so that the following environment variables are set
 by default:
@@ -604,8 +582,7 @@ example:
 **Important:** If you customise your shell profile (`.bashrc`, `.zshrc`,
 etc.), make sure you don't override these TPU environment variables.
 
-Using multiple devices on one TPU VM
-------------------------------------
+## Using multiple devices on one TPU VM
 
 The `tpu-device` wrapper also supports running on multiple devices at
 once. You can use a pair of devices (`0,1` or `2,3`) or all four
@@ -623,8 +600,7 @@ combinations like `0,2`.
 If you want to actually use all four devices you would then need to write your
 JAX code to use `jax.pmap`.
 
-Using multiple devices on multiple TPU VMs
-------------------------------------------
+## Using multiple devices on multiple TPU VMs
 
 In principle it is also possible to run one command across multiple VMs,
 however I haven't set this up before so don't know how to do it. If you need
@@ -633,8 +609,7 @@ will need to figure out the appropriate combination of environment variables
 and override the defaults, which stop the TPUs from trying to talk to
 each-other.
 
-Customising your shell
-----------------------
+## Customising your shell
 
 The default login shell is bash. You can switch to another installed shell if
 you prefer. Custom shells installed:
@@ -679,15 +654,13 @@ export TPU_VISIBLE_DEVICES=0
 export PJRT_DEVICE=TPU
 ```
 
-Customising other tools
------------------------
+## Customising other tools
 
 Most other changes are easier, make yourself at home via dotfiles like you
 normally would. You can set up your path, default editor, etc., in your
 profile. If you want me to install some missing standard software, just ask.
 
-Graduating to your own cluster
-------------------------------
+## Graduating to your own cluster
 
 If you need more compute, or want more space to run your own experiments
 for other projects, or whatever, it's pretty easy to get access to your

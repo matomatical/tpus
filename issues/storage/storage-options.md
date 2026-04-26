@@ -740,12 +740,12 @@ User handbook gets a one-line tip pointing at this for the
 
 #### Maintenance schedule (tpu0 only)
 
-| Frequency | Task                                                      | Status                          |
-|-----------|-----------------------------------------------------------|---------------------------------|
-| Hourly    | `juicefs dump` → `gs://.../backups/`, tiered prune        | live (`juicefs-backup.timer`)   |
-| Weekly    | `juicefs gc --compact` (defragment slices)                | pending — next iteration        |
-| Manual    | `juicefs gc --delete` (until we trust it; first few runs) | pending — next iteration        |
-| Manual    | `juicefs fsck` (consistency check)                        | run as part of recovery testing |
+| Frequency | Task                                                      | Status                            |
+|-----------|-----------------------------------------------------------|-----------------------------------|
+| Hourly    | `juicefs dump` → `gs://.../backups/`, tiered prune        | live (`juicefs-backup.timer`)     |
+| Weekly    | `juicefs gc --compact` (defragment slices)                | live (`juicefs-gc-compact.timer`) |
+| Manual    | `juicefs gc --delete` (reconciliation backstop)           | manual; mount handles trash       |
+| Manual    | `juicefs fsck` (consistency check)                        | run as part of recovery testing   |
 
 Scheduled tasks read `META_PASSWORD` from `/etc/juicefs/redis.env`
 (systemd `EnvironmentFile=` on services, manual `. /etc/juicefs/redis.env;

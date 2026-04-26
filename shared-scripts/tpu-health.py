@@ -214,6 +214,8 @@ def check_gcs_errors(metrics):
 
 BACKUP_TIMER_UNIT = "/etc/systemd/system/juicefs-backup.timer"
 BACKUP_NAME_RE = re.compile(r"^dump-(\d{8}T\d{6}Z)\.json\.gz$")
+GC_COMPACT_TIMER_UNIT = "/etc/systemd/system/juicefs-gc-compact.timer"
+SYSTEMD_TS_FMT = "%a %Y-%m-%d %H:%M:%S %Z"
 
 
 def check_backup_timer():
@@ -289,6 +291,85 @@ def check_backup_freshness():
         status = "OK"
     return status, f"{age_h:.1f}h", \
         f"newest backup {age_h:.1f}h old ({newest}); {len(names)} kept"
+
+
+def check_gc_timer():
+    """juicefs-gc-compact.timer active and last service run succeeded.
+
+    Only runs on the node where the timer is deployed (tpu0). Other nodes
+    see SKIP."""
+    if not os.path.exists(GC_COMPACT_TIMER_UNIT):
+        return "SKIP", "n/a", "gc-compact timer (not deployed on this node)"
+    try:
+        r = subprocess.run(
+            ["systemctl", "is-active", "juicefs-gc-compact.timer"],
+            capture_output=True, text=True, timeout=3,
+        )
+        active = r.stdout.strip() or "unknown"
+        if active != "active":
+            return "CRIT", active, f"gc-compact timer is {active!r}"
+        r2 = subprocess.run(
+            ["systemctl", "show", "juicefs-gc-compact.service", "-p", "Result"],
+            capture_output=True, text=True, timeout=3,
+        )
+        result = {}
+        for line in r2.stdout.splitlines():
+            k, _, v = line.partition("=")
+            result[k] = v
+        last_result = result.get("Result", "")
+        if last_result not in ("success", ""):
+            return "CRIT", last_result or "?", \
+                f"gc-compact last result: {last_result!r}"
+        return "OK", "active", "gc-compact timer active, last run ok"
+    except Exception as e:
+        return "CRIT", "error", f"gc-compact timer check error: {e}"
+
+
+def check_gc_freshness():
+    """Age of last juicefs-gc-compact.service run.
+
+    Only runs on the node where the timer is deployed (tpu0). Other nodes
+    see SKIP. Threshold: warn at >14d (one missed weekly run), crit at >21d.
+    Reads ExecMainExitTimestamp from systemctl — no network calls."""
+    if not os.path.exists(GC_COMPACT_TIMER_UNIT):
+        return "SKIP", "n/a", "gc-compact freshness (not on backup node)"
+    try:
+        r = subprocess.run(
+            ["systemctl", "show", "juicefs-gc-compact.service",
+             "-p", "ExecMainExitTimestamp"],
+            capture_output=True, text=True, timeout=3,
+        )
+    except Exception as e:
+        return "CRIT", "error", f"gc-compact freshness error: {e}"
+    if r.returncode != 0:
+        return "CRIT", "show fail", "gc-compact systemctl show failed"
+    ts_str = ""
+    for line in r.stdout.splitlines():
+        if line.startswith("ExecMainExitTimestamp="):
+            ts_str = line.partition("=")[2].strip()
+            break
+    if not ts_str or ts_str == "n/a":
+        return "WARN", "never", "gc-compact has never run successfully"
+    try:
+        ts = dt.datetime.strptime(ts_str, SYSTEMD_TS_FMT) \
+            .replace(tzinfo=dt.timezone.utc)
+    except ValueError as e:
+        return "WARN", "parse?", \
+            f"gc-compact timestamp parse error: {e!r} ({ts_str!r})"
+    age_s = (dt.datetime.now(dt.timezone.utc) - ts).total_seconds()
+    age_d = age_s / 86400
+    if age_d >= 21:
+        status = "CRIT"
+    elif age_d >= 14:
+        status = "WARN"
+    else:
+        status = "OK"
+    if age_s < 86400:
+        age_str = f"{age_s / 3600:.1f}h"
+    else:
+        age_str = f"{age_d:.1f}d"
+    return status, age_str, \
+        f"gc-compact last run {age_str} ago ({ts_str})"
 
 
 def check_redis_ping():
@@ -429,6 +510,8 @@ def _build_check_list(metrics, cache_cap):
         ("redis",       check_redis_ping),
         ("bk timer",    check_backup_timer),
         ("bk fresh",    check_backup_freshness),
+        ("gc timer",    check_gc_timer),
+        ("gc fresh",    check_gc_freshness),
     ]
 
 

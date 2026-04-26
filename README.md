@@ -99,8 +99,8 @@ Major feature: Persistent shared storage
 * [x] Rewrite `tpu-health` as admin-only cluster-wide tool with /storage
   signals (mount, capacity, cache, rawstaging, GCS errors) and Redis ping.
 * [x] Validate and automate juicefs redis database backups.
-* [ ] Weekly `juicefs gc --compact`; first manual runs of `gc --delete`
-  and `fsck`.
+* [x] Weekly `juicefs gc --compact`; manual `gc` and `fsck` baseline clean.
+* [x] `tpu-health`: `gc timer` and `gc fresh` rows for the weekly compact job.
 
 Major feature: TPU queueing system (prerequisite, persistent shared storage)
 

@@ -1,8 +1,7 @@
 Initialising a TPU VM
 =====================
 
-Budget alerts
--------------
+## Budget alerts
 
 Notes:
 
@@ -13,8 +12,7 @@ Notes:
   happens.
 
 
-Provisioning
-------------
+## Provisioning
 
 In GCP console, go to compute > TPUs and create a new TPU resource. The
 configuration should match the allocation from allocation email.
@@ -102,8 +100,7 @@ contents of the GCS bucket as it ultimately contains sensitive data from each
 user. Maybe using a service account key, as in the workaround below, is
 actually easier here.
 
-SSH config
-----------
+## SSH config
 
 Create a key (if haven't already):
 
@@ -117,7 +114,7 @@ Add key to cluster with GCP console (compute > metadata > ssh keys).
 Configure `~/.ssh/config` (get IP addresses from GCP console):
 
 ```ssh_config
-## MFR's tiny TPU cluster
+# MFR's tiny TPU cluster
 Host tpu0 tpu1 tpu2 tpu3
     IdentityFile ~/.ssh/mfr-tpus
     User matt
@@ -185,8 +182,7 @@ sudo shutdown -r now
 However, I later realised I didn't want to `do-release-upgrade` and I should
 just recreate the cluster instead...
 
-Installing uv
--------------
+## Installing uv
 
 Install uv as a standalone binary
 ([docs](https://docs.astral.sh/uv/getting-started/installation/)):
@@ -212,8 +208,7 @@ uv venv --python 3.14
 Then uv manages Python versions and virtual environments without modifying the
 system Python.
 
-Installing custom scripts
--------------------------
+## Installing custom scripts
 
 ```
 for t in 0 1 2 3; do
@@ -280,8 +275,7 @@ The web server logs to `/dev/shm/tpu-heartbeat-web.log` (tmpfs) rather than
 disk to avoid ext4 journal contention when training jobs are writing heavily.
 Install the logrotate config to cap the log size (see logrotate section below).
 
-Installing user handbook
-------------------------
+## Installing user handbook
 
 `user-handbook.md` is deployed to `/usr/local/share/doc/tpus/user-handbook.md`
 on each VM (FHS-standard location for locally-installed documentation). This
@@ -305,8 +299,7 @@ of truth; `/usr/local/share/doc/tpus/user-handbook.md` is a deployment
 artifact, not an editing target. (`admin-handbook.md` is *not* deployed —
 it's admin-only and lives in the repo.)
 
-Adding new users
-----------------
+## Adding new users
 
 Instruct users to select a username <USERNAME> and generate a public key as
 follows:
@@ -328,8 +321,7 @@ VMs. For example:
 
 Remember to append the invocation to `users.md`.
 
-TPU logging permission
-----------------------
+## TPU logging permission
 
 The TPU runtime writes logs to `/tmp/tpu_logs/`. Whichever user first triggers
 this directory's creation ends up owning it, and other users get "Permission
@@ -345,35 +337,7 @@ for t in 0 1 2 3; do
 done
 ```
 
-/tmp age-based cleanup
-----------------------
-
-The upstream `/usr/lib/tmpfiles.d/tmp.conf` only clears `/tmp` on boot. TPU
-VMs don't reboot, so `/tmp` accumulates indefinitely (stale ssh sockets,
-rotated tpu-runtime logs, old wandb artifacts, etc.). We override it with a
-14-day age so the daily `systemd-tmpfiles-clean.timer` prunes old entries.
-
-```
-for t in 0 1 2 3; do
-  scp conf/tmpfiles-tmp.conf tpu$t:
-  ssh tpu$t 'sudo install -m 644 ~/tmpfiles-tmp.conf /etc/tmpfiles.d/tmp.conf && rm ~/tmpfiles-tmp.conf'
-done
-```
-
-Our file is named `tmp.conf` at the destination to override the upstream
-file of the same name in `/usr/lib/tmpfiles.d/`. Managed subdirs like
-`.X11-unix` and `/tmp/tpu_logs/` have their own tmpfiles.d rules and are
-unaffected.
-
-To flush the existing backlog immediately rather than waiting for the next
-daily run:
-
-```
-sudo systemd-tmpfiles --clean
-```
-
-System log size limits
-----------------------
+## System log size limits
 
 Check storage:
 
@@ -470,8 +434,33 @@ The daemon/kern messages still reach the usual `/var/log/*` and journal
 destinations via other rsyslog rules; we're only dropping the console
 fan-out, which was never working anyway.
 
-Configuring intra-cluster SSH
------------------------------
+## /tmp age-based cleanup
+
+The upstream `/usr/lib/tmpfiles.d/tmp.conf` only clears `/tmp` on boot. TPU
+VMs don't reboot, so `/tmp` accumulates indefinitely (stale ssh sockets,
+rotated tpu-runtime logs, old wandb artifacts, etc.). We override it with a
+14-day age so the daily `systemd-tmpfiles-clean.timer` prunes old entries.
+
+```
+for t in 0 1 2 3; do
+  scp conf/tmpfiles-tmp.conf tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/tmpfiles-tmp.conf /etc/tmpfiles.d/tmp.conf && rm ~/tmpfiles-tmp.conf'
+done
+```
+
+Our file is named `tmp.conf` at the destination to override the upstream
+file of the same name in `/usr/lib/tmpfiles.d/`. Managed subdirs like
+`.X11-unix` and `/tmp/tpu_logs/` have their own tmpfiles.d rules and are
+unaffected.
+
+To flush the existing backlog immediately rather than waiting for the next
+daily run:
+
+```
+sudo systemd-tmpfiles --clean
+```
+
+## Configuring intra-cluster SSH
 
 All users can `ssh tpuX` between VMs using `/etc/hosts` for name resolution,
 a system-wide SSH client config for the identity file, and per-user cluster
@@ -508,8 +497,7 @@ Anyway it doesn't seem to be a wider problem so I'll just leave it...
 Update: Later, I can't seem to reproduce this. So just use blank line or double
 comment for now.
 
-Miscelaneous issues
--------------------
+## Miscelaneous issues
 
 ### Trouble: bash shows a setlocale warning
 
@@ -526,8 +514,7 @@ for t in 0 1 2 3; do
 done
 ```
 
-Default TPU environment variables
----------------------------------
+## Default TPU environment variables
 
 By default, JAX and PyTorch/XLA try to coordinate across all 4 VMs in the pod,
 which causes programs to hang if they aren't launched with the right environment
@@ -556,8 +543,63 @@ will show nothing — on *all* VMs, not just one. To pick up the defaults across
 SSH, force a login/interactive shell, e.g. `ssh tpuN 'bash -lc "cmd"'` or
 `ssh tpuN 'zsh -ic "cmd"'`.
 
-Making myself at home
----------------------
+## Other packages
+
+Other system packages:
+
+```
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo apt install -y ffmpeg pandoc entr'
+done
+```
+
+## Installing LaTeX
+
+LaTeX has various distributions with various sizes
+  (see [here](https://tex.stackexchange.com/questions/245982/differences-between-texlive-packages-in-linux#answer-504566)
+  for notes on different options).
+While we are a bit short on space, that should hopefully clear up soon based on
+the JuiceFS project, and I kept running into missing packages, fonts, and tools
+even with `texlive-latex-extra`. So I'm installing the full `texlive-full`:
+
+```
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo apt install -y texlive-full'
+done
+```
+
+TODO: Confirm this comes with `latexmk cm-super dvipng`, previously installed
+manually.
+
+Ideally could use tectonic, but students may find that confusing. For space
+reasons, I don't want to install both. Note tectonic is not available via apt,
+only snap and brew, which adds complexity. Could install manually following
+their instructions.
+
+## Installing NodeJS / node apps
+
+Node available from apt is ridiculously old. I went with nvm. This means it's a
+local install and I only did it on tpu0 so far.
+
+```
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+```
+
+Note: it adds stuff to zshrc to get onto path.
+
+Installing apps can then use -g because that is still only me:
+
+```
+npm install -g @google/gemini-cli # google gemini
+npm install -g @openai/codex      # openai codex
+```
+
+If I needed to install node system packages globally? Hope I never face that
+issue, but probably nvm can be configured to handle it. Ideally it is just like
+uv and people can take care of their own environments.
+
+
+## Making myself at home
 
 ### Configuring my GitHub
 
@@ -588,7 +630,7 @@ happen on my laptop?). A simpler solution seems to be to add this to
 ~/.ssh/config on each VM:
 
 ```
-## GitHub keys
+# GitHub keys
 Host github.com
   User git
   IdentityFile ~/.ssh/{name-of-your-key}
@@ -617,64 +659,7 @@ for t in 0 1 2 3; do
 done
 ```
 
-### Other packages
-
-Other system packages:
-
-```
-for t in 0 1 2 3; do
-  ssh tpu$t 'sudo apt install -y ffmpeg pandoc entr'
-done
-```
-
-### Installing LaTeX
-
-LaTeX has various distributions with various sizes
-  (see [here](https://tex.stackexchange.com/questions/245982/differences-between-texlive-packages-in-linux#answer-504566)
-  for notes on different options).
-While we are a bit short on space, that should hopefully clear up soon based on
-the JuiceFS project, and I kept running into missing packages, fonts, and tools
-even with `texlive-latex-extra`. So I'm installing the full `texlive-full`:
-
-```
-for t in 0 1 2 3; do
-  ssh tpu$t 'sudo apt install -y texlive-full'
-done
-```
-
-TODO: Confirm this comes with `latexmk cm-super dvipng`, previously installed
-manually.
-
-Ideally could use tectonic, but students may find that confusing. For space
-reasons, I don't want to install both. Note tectonic is not available via apt,
-only snap and brew, which adds complexity. Could install manually following
-their instructions.
-
-### Installing NodeJS / node apps
-
-Node available from apt is ridiculously old. I went with nvm. This means it's a
-local install and I only did it on tpu0 so far.
-
-```
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
-```
-
-Note: it adds stuff to zshrc to get onto path.
-
-Installing apps can then use -g because that is still only me:
-
-```
-npm install -g @google/gemini-cli # google gemini
-npm install -g @openai/codex      # openai codex
-```
-
-If I needed to install node system packages globally? Hope I never face that
-issue, but probably nvm can be configured to handle it. Ideally it is just like
-uv and people can take care of their own environments.
-
-
-Security goals
---------------
+## Security goals
 
 The user handbook promises that non-admin users can't access each other's files
 and that only the admin (matt) has elevated privileges. The users themselves
@@ -711,8 +696,7 @@ Not currently hardened (standard Linux defaults, acceptable for now):
   via `ps`. Avoid passing secrets as CLI arguments.
 * No disk quotas or cgroups, so one user could fill the disk or exhaust memory.
 
-Secrets
--------
+## Secrets
 
 Credentials are stored in `secrets/` (gitignored). That directory holds
 credentials that should not be in the public repo.
@@ -749,8 +733,7 @@ Contents:
 These secrets are only needed on the running cluster. If the cluster is
 re-provisioned from scratch, generate fresh secrets and redeploy.
 
-Shared storage (JuiceFS)
-------------------------
+## Shared storage (JuiceFS)
 
 We use JuiceFS Community Edition to provide a shared POSIX filesystem across
 all 4 VMs. Data lives in a GCS bucket, metadata in Redis on tpu0, and each VM
@@ -1083,6 +1066,101 @@ fresh db (e.g. db 15 for a test) and inspect first.
 End-to-end recovery test (validated 2026-04-25): load = 33s, fsck = 60s,
 rc=0, 688K blocks / 662K slices / ~150 GB consistent.
 
+### Maintenance: gc, fsck, and the deletion model (tpu0 only)
+
+JuiceFS deletion happens in three layers; understanding which layer you're
+looking at avoids confusion when a cleanup command does "nothing":
+
+1. **Trash** (`/storage/.trash/<HHMM-group>/`). Every `rm` moves the file
+   here, indistinguishable from a regular file in storage. Default
+   retention is `TrashDays=1`. While in trash, GCS objects are *valid*
+   (referenced by metadata) — `gc` will not flag them. Filenames inside
+   each group are rewritten as `<parent_inode>-<inode>-<basename>` so the
+   original location can be reconstructed for a manual restore.
+2. **Delayed deletion** (`delfiles` / `delslices` lists in Redis). Once
+   trash expires, the live mount's background scanner removes the trash
+   entries and pushes the freed slices/files onto these lists, then walks
+   the lists and deletes the GCS objects asynchronously.
+3. **Leaked objects.** GCS objects with no metadata reference at all.
+   Should not normally occur, but can result from interrupted writeback
+   uploads, mount crashes mid-deletion, etc.
+
+The relevant commands:
+
+| Command                | What it does                                                                | When to run                       |
+|------------------------|-----------------------------------------------------------------------------|-----------------------------------|
+| `juicefs fsck`         | Cross-checks metadata vs storage; flags lost blocks / broken files (read-only). | Manual, ad-hoc when investigating.|
+| `juicefs gc`           | Scans for leaked objects + reports counters (read-only — no `--dry-run` flag). | Manual, ad-hoc.                  |
+| `juicefs gc --compact` | Merges small slices into bigger chunks (reduces GCS object count).          | Weekly, automated (see below).    |
+| `juicefs gc --delete`  | Forces processing of the delfiles/delslices lists + cleans leaked objects.  | Manual reconciliation backstop.   |
+
+`gc --delete` is **not** what empties the trash — `TrashDays` + the
+mount's background scanner do that. `--delete` is the recovery tool when
+that scanner has fallen behind (mount crashed mid-deletion, GCS was
+unreachable, etc.).
+
+To run any of these by hand, env-load Redis password and GCS credentials
+inside a sudo'd shell so neither hits the world-readable `/proc/<pid>/cmdline`:
+
+```
+sudo bash -c '
+  . /etc/juicefs/redis.env
+  export META_PASSWORD GOOGLE_APPLICATION_CREDENTIALS=/etc/juicefs/sa-private-key.json
+  juicefs fsck   redis://tpu0:6379/0           # consistency
+  juicefs gc     redis://tpu0:6379/0           # check-only scan
+  juicefs gc     redis://tpu0:6379/0 --delete  # force-cleanup pass
+'
+```
+
+Reading the `gc` summary line: `scanned`, `valid`, `pending delete`,
+`compacted`, `leaked`, `delslices`, `delfiles`, `skipped`. In normal
+operation `leaked` and `delfiles` are 0; `compacted` and `delslices` may
+be non-zero between weekly compaction runs.
+
+#### Weekly `gc --compact` automation
+
+A systemd timer runs `juicefs gc --compact` weekly to merge accumulated
+small slices. Mirrors the backup unit but loads env directly in the unit
+(no wrapper script needed for a single command):
+
+- `conf/juicefs-gc-compact.service` — oneshot, ordered after
+  `redis-server.service` and `storage.mount`. `EnvironmentFile=/etc/juicefs/redis.env`
+  for `META_PASSWORD`; `Environment=GOOGLE_APPLICATION_CREDENTIALS=...`
+  for the GCS SA key. `TimeoutStartSec=30min`.
+- `conf/juicefs-gc-compact.timer` — `OnCalendar=Sun 04:00:00 UTC`,
+  `Persistent=true`.
+
+Deploy on tpu0:
+
+```
+scp conf/juicefs-gc-compact.service conf/juicefs-gc-compact.timer tpu0:
+ssh tpu0 'sudo install -m 0644 -o root -g root \
+            ~/juicefs-gc-compact.service /etc/systemd/system/juicefs-gc-compact.service \
+       && sudo install -m 0644 -o root -g root \
+            ~/juicefs-gc-compact.timer   /etc/systemd/system/juicefs-gc-compact.timer \
+       && rm ~/juicefs-gc-compact.service ~/juicefs-gc-compact.timer \
+       && sudo systemctl daemon-reload \
+       && sudo systemctl enable --now juicefs-gc-compact.timer'
+```
+
+Verify:
+
+```
+sudo systemctl start juicefs-gc-compact.service   # one manual run; ~50s
+systemctl list-timers juicefs-gc-compact.timer
+tpu-health                                        # `gc timer` / `gc fresh` rows
+```
+
+`tpu-health` reports `gc timer` (timer active + last result success) and
+`gc fresh` (age since last completion, parsed from
+`systemctl show -p ExecMainExitTimestamp`). Thresholds: WARN at >14d
+(one missed run), CRIT at >21d.
+
+Caveat: `systemctl enable --now <timer>` resets the *service* unit's
+timestamps. If `gc fresh` shows `never` immediately after enabling the
+timer, trigger one run by hand (`sudo systemctl start
+juicefs-gc-compact.service`) to populate it.
+
 ### Migrate a user's home to `/storage`
 
 One-time procedure per user, codified as `admin-scripts/migrate-home.sh
@@ -1091,8 +1169,7 @@ rsyncs in parallel with progress lines, then flips the passwd entry and
 verifies `sudo -u <user> -i pwd` on each node. The manual checklist below
 documents the same steps in case you ever need to do it by hand.
 
-TODO: Job management
---------------------
+## TODO: Job management
 
 See this discussion with gemini for hq configuration:
 

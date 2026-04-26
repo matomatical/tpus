@@ -1,0 +1,12 @@
+[Unit]
+Description=JuiceFS gc --compact (merge small slices)
+After=redis-server.service storage.mount network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/juicefs/redis.env
+Environment="GOOGLE_APPLICATION_CREDENTIALS=/etc/juicefs/sa-private-key.json"
+ExecStart=/usr/bin/juicefs gc redis://tpu0:6379/0 --compact
+TimeoutStartSec=30min
+PrivateTmp=true
