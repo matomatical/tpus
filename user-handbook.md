@@ -582,6 +582,14 @@ example:
 **Important:** If you customise your shell profile (`.bashrc`, `.zshrc`,
 etc.), make sure you don't override these TPU environment variables.
 
+The default profile and `tpu-device` also append a flag to `LIBTPU_INIT_ARGS`
+that pins libtpu's metrics gRPC service to a per-chip port (8431 for chip 0,
+8432 for chip 1, etc.). This stops concurrent TPU jobs on the same VM
+fighting over the default port and gives a future cluster monitor a way to
+address each chip's metrics individually. You can override by setting your
+own `--runtime_metric_service_port=...` in `LIBTPU_INIT_ARGS` before
+launching.
+
 ## Using multiple devices on one TPU VM
 
 The `tpu-device` wrapper also supports running on multiple devices at

@@ -60,4 +60,15 @@ if [ "$NUM_DEVICES" -eq 2 ]; then
     export TPU_MESH_CONTROLLER_PORT=$PORT
 fi
 
+# Per-chip libtpu metrics-service port (8431 + first dev id). Without this,
+# every libtpu instance binds the default 8431 and the kernel SO_REUSEPORTs
+# them: a single monitoring client gets hash-routed to one listener, opaque
+# to which chip it is. Explicit ports let the heartbeat collector enumerate
+# chips deterministically. Skip if the caller already set the flag.
+FIRST_DEV=${DEVICE_IDS%%,*}
+# Match the flag regardless of -/-- prefix or =/space separator.
+if [[ "$LIBTPU_INIT_ARGS" != *runtime_metric_service_port* ]]; then
+    export LIBTPU_INIT_ARGS="${LIBTPU_INIT_ARGS:+$LIBTPU_INIT_ARGS }--runtime_metric_service_port=$((8431 + FIRST_DEV))"
+fi
+
 exec "$@"

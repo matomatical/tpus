@@ -85,6 +85,7 @@ April 2026, backend stability improvements:
   for stable reference from user shells / CLAUDE.md files.
 * [x] Security review and follow-up.
 * [x] Service configuration stability improvements.
+* [x] tpu-device: pin libtpu metrics service to a per-chip port.
 
 Major feature: Persistent shared storage
 

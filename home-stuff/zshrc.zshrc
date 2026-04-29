@@ -29,6 +29,9 @@ export TPU_CHIPS_PER_PROCESS_BOUNDS=1,1,1
 export TPU_PROCESS_BOUNDS=1,1,1
 export TPU_VISIBLE_DEVICES=0
 export PJRT_DEVICE=TPU
+if [[ "$LIBTPU_INIT_ARGS" != *runtime_metric_service_port* ]]; then
+    export LIBTPU_INIT_ARGS="${LIBTPU_INIT_ARGS:+$LIBTPU_INIT_ARGS }--runtime_metric_service_port=8431"
+fi
 
 # shortcut for managing virtual environments
 function auto_activate() {
@@ -70,3 +73,7 @@ alias ls='ls --color=auto'
 alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
