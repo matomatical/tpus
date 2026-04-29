@@ -1,0 +1,14 @@
+[Unit]
+Description=TPU Metrics — poll libtpu monitoring API and write metrics.json
+After=tpu-heartbeat.service
+Wants=tpu-heartbeat.service
+
+[Service]
+ExecStart=/opt/tpu-metrics.venv/bin/python /home/shared/tpu-metrics.py
+Restart=always
+RestartSec=30
+StartLimitBurst=5
+StartLimitIntervalSec=300
+
+[Install]
+WantedBy=multi-user.target

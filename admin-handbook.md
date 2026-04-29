@@ -228,6 +228,7 @@ for t in 0 1 2 3; do
     sudo install -m 755 \
       ~/tpu-device.sh ~/tpu-warmup.sh ~/tpu-heartbeat.py \
       ~/tpu-heatmap.py ~/tpu-usage.py ~/tpups.py \
+      ~/tpu-metrics.py \
       /home/shared/
     sudo install -m 750 -o root -g matt ~/tpu-health.py /home/shared/tpu-health.py
     rm ~/tpu-*.sh ~/tpu-*.py ~/tpups.py
@@ -274,6 +275,63 @@ done
 The web server logs to `/dev/shm/tpu-heartbeat-web.log` (tmpfs) rather than
 disk to avoid ext4 journal contention when training jobs are writing heavily.
 Install the logrotate config to cap the log size (see logrotate section below).
+
+## TPU metrics sidecar
+
+`tpu-metrics.service` polls each user libtpu's gRPC metrics service on
+`localhost:(8431 + first_owned_chip_id)` every 5s and writes
+`/home/shared/heartbeat/metrics.json`. The companion `tpu-heartbeat-web`
+already serves the entire `heartbeat/` directory, so the new file is
+automatically reachable on `:8080`. `tpups` joins the metrics with `status.json`
+to populate the `MEM`/`DUT` columns and the `--watch` view.
+
+Unlike `tpu-heartbeat.py` (stdlib only), the sidecar imports `tpu_info` and
+`grpc`, so it runs out of a dedicated root-owned venv at
+`/opt/tpu-metrics.venv/`. **One-time bootstrap** per VM:
+
+```
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo uv venv --python /usr/bin/python3.11 /opt/tpu-metrics.venv && \
+             sudo uv pip install --python /opt/tpu-metrics.venv/bin/python \
+               tpu-info==0.11.0 libtpu==0.0.40 && \
+             sudo uv pip freeze --python /opt/tpu-metrics.venv/bin/python | \
+               sudo tee /opt/tpu-metrics.venv/requirements.txt > /dev/null'
+done
+```
+
+Pin libtpu (currently `0.0.40`) to a known-good release. The sidecar's gRPC
+queries are version-agnostic (the protocol has been stable across observed user
+libtpus 0.0.30..0.0.40), so this pin only affects the sidecar process itself.
+`tpu-info` is installed alongside as a side effect of needing the
+`tpu_info.metrics` library; the binary at `/opt/tpu-metrics.venv/bin/tpu-info`
+is admin-invokable for ad-hoc debugging but is not on user PATH.
+
+Tensorcore utilisation is **not** collected: the upstream `tpu_info` CLI
+itself reports `N/A` on this cluster (the `vbar control agent` that publishes
+that metric is not installed). Re-add `TCU` to the sidecar and `tpups` once
+the underlying agent is available.
+
+Install the unit and start the service:
+
+```
+for t in 0 1 2 3; do
+  scp conf/tpu-metrics.service tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/tpu-metrics.service /etc/systemd/system/ && \
+             rm ~/tpu-metrics.service && \
+             sudo systemctl daemon-reload && \
+             sudo systemctl enable --now tpu-metrics.service'
+done
+```
+
+Restart cadence is `RestartSec=30` with `StartLimitBurst=5` —
+intentionally laxer than heartbeat's 5s, since libtpu/tpu_info imports are
+exactly the kind of code that breaks under version skew and we don't want a
+crash loop spamming journald.
+
+**Reprovisioning the venv** (e.g. to bump pinned versions): re-run the
+bootstrap loop above with new pins and `sudo systemctl restart
+tpu-metrics.service` on each VM. The lockfile at
+`/opt/tpu-metrics.venv/requirements.txt` is the audit record.
 
 ## Installing user handbook
 

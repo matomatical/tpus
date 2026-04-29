@@ -62,6 +62,7 @@ April 2026, feature upgrades:
 * [x] `tpups` in MOTD.
 * [x] tpu-device: CPU mode (`tpu-device cpu`) for JAX and PyTorch/XLA.
 * [x] tpups: fail gracefully when servers are unreachable, speed improvements
+* [x] tpups: --watch variant for live reloading, dynamic columns
 
 April 2026, backend stability improvements:
 
@@ -103,6 +104,14 @@ Major feature: Persistent shared storage
 * [x] Validate and automate juicefs redis database backups.
 * [x] Weekly `juicefs gc --compact`; manual `gc` and `fsck` baseline clean.
 * [x] `tpu-health`: `gc timer` and `gc fresh` rows for the weekly compact job.
+
+TPU monitoring improvements
+
+* [x] upgrade tpups with memory/processor utilisation
+* [ ] also tensorcore utilization?
+* [ ] time series for active processing
+* [ ] web dashboard for tpups, usage, heatmap, recent history of metrics
+* [ ] public web dashboard (rather than ssh port forward)
 
 Major feature: TPU queueing system (prerequisite, persistent shared storage)
 
