@@ -460,6 +460,34 @@ daily run:
 sudo systemd-tmpfiles --clean
 ```
 
+## Disabling needrestart auto-restart
+
+`needrestart` runs as a `DPkg::Post-Invoke` hook (`/etc/apt/apt.conf.d/99needrestart`)
+after every `apt` operation. Its default behaviour is to scan running services
+for stale library mappings (e.g. an old `libsystemd0.so` still mapped after the
+package was upgraded) and **automatically restart them**. On this cluster that
+has caused cascading restarts of `systemd-resolved`, `systemd-networkd`,
+`redis-server`, `sshd`, `dbus`, etc. as a side effect of an unrelated
+`apt install`. Side effects observed: ~90 s DNS outages, brief Redis outages
+that nearly unmounted `/storage`, and a flurry of "GCS" errors counted by
+JuiceFS while DNS was down.
+
+Override needrestart to list-only mode so the post-apt scan still runs (and
+its findings show up via `tpu-health` → `stale libs`) but no service is
+touched. Reboots are scheduled manually.
+
+```
+for t in 0 1 2 3; do
+  scp conf/needrestart-list-only.conf tpu$t:
+  ssh tpu$t 'sudo install -m 644 -o root -g root ~/needrestart-list-only.conf /etc/needrestart/conf.d/list-only.conf && rm ~/needrestart-list-only.conf'
+done
+```
+
+The override file sets `$nrconf{restart} = 'l'` (list mode). needrestart
+loads any `*.conf` in `/etc/needrestart/conf.d/` after the main config, so
+this overrides the upstream default without editing the package-managed
+file.
+
 ## Configuring intra-cluster SSH
 
 All users can `ssh tpuX` between VMs using `/etc/hosts` for name resolution,
@@ -549,7 +577,7 @@ Other system packages:
 
 ```
 for t in 0 1 2 3; do
-  ssh tpu$t 'sudo apt install -y ffmpeg pandoc entr'
+  ssh tpu$t 'sudo apt install -y ffmpeg pandoc entr xvfb libopenmpi-dev'
 done
 ```
 
@@ -952,7 +980,11 @@ done
 ```
 
 On tpu0 only, install a drop-in that orders the mount after `redis-server.service`
-(the other nodes reach Redis over the network and need only the shared unit):
+(the other nodes reach Redis over the network and need only the shared unit).
+The drop-in uses `Wants=` rather than `Requires=`: `Requires=` would propagate
+a `redis-server` restart into a `/storage` unmount attempt, which can drop
+every user's open file in `/storage`. JuiceFS reconnects to Redis on its
+own across a brief restart, so the strict coupling buys nothing:
 
 ```
 sudo mkdir -p /etc/systemd/system/storage.mount.d

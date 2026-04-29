@@ -84,6 +84,7 @@ April 2026, backend stability improvements:
 * [x] Deploy `user-handbook.md` to `/usr/local/share/doc/tpus/` on each VM
   for stable reference from user shells / CLAUDE.md files.
 * [x] Security review and follow-up.
+* [x] Service configuration stability improvements.
 
 Major feature: Persistent shared storage
 

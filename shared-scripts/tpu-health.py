@@ -55,6 +55,20 @@ def check_disk():
         f"disk {pct:.0f}% used ({free_gb:.0f} GiB free of {total_gb:.0f} GiB)"
 
 
+def check_uptime():
+    """Days since last boot. Warn at >=28 to nudge a maintenance reboot."""
+    try:
+        with open("/proc/uptime") as f:
+            secs = float(f.read().split()[0])
+    except Exception as e:
+        return "CRIT", "error", f"uptime read failed: {e}"
+    days = secs / 86400
+    if days >= 28:
+        return "WARN", f"{days:.0f}d", \
+            f"uptime {days:.0f}d (consider a maintenance reboot)"
+    return "OK", f"{days:.0f}d", f"uptime {days:.0f}d"
+
+
 def check_heartbeat():
     try:
         with open("/home/shared/heartbeat/status.json") as f:
@@ -372,6 +386,33 @@ def check_gc_freshness():
         f"gc-compact last run {age_str} ago ({ts_str})"
 
 
+def check_needrestart():
+    """Count services with stale library mappings via `needrestart -b -r l`.
+
+    Surfaces the maintenance signal that needrestart used to act on
+    automatically (post-apt). Now needrestart is configured list-only
+    (see /etc/needrestart/conf.d/list-only.conf) and we just count.
+    Requires passwordless sudo for a complete view (admin users have it
+    via google-sudoers; less-privileged callers see SKIP)."""
+    try:
+        r = subprocess.run(
+            ["sudo", "-n", "needrestart", "-b", "-r", "l"],
+            capture_output=True, text=True, timeout=10,
+        )
+    except subprocess.TimeoutExpired:
+        return "WARN", "timeout", "needrestart timed out"
+    except FileNotFoundError:
+        return "SKIP", "n/a", "needrestart (not installed)"
+    if r.returncode != 0:
+        return "SKIP", "n/a", "needrestart (sudo or invocation failed)"
+    stale = sum(1 for line in r.stdout.splitlines()
+                if line.startswith("NEEDRESTART-SVC:"))
+    if stale == 0:
+        return "OK", "0", "no services with stale library mappings"
+    return "WARN", str(stale), \
+        f"{stale} service(s) with stale lib mappings (manual restart or reboot)"
+
+
 def check_redis_ping():
     """Ping Redis on tpu0. Reads password from /etc/juicefs/redis.env via sudo,
     passes to redis-cli via REDISCLI_AUTH env var (not `-a`, which would expose
@@ -499,6 +540,7 @@ def _colored(status, text, use_color):
 def _build_check_list(metrics, cache_cap):
     return [
         ("disk",        check_disk),
+        ("uptime",      check_uptime),
         ("heartbeat",   check_heartbeat),
         ("services",    check_services),
         ("healthAgent", check_healthagent),
@@ -512,6 +554,7 @@ def _build_check_list(metrics, cache_cap):
         ("bk fresh",    check_backup_freshness),
         ("gc timer",    check_gc_timer),
         ("gc fresh",    check_gc_freshness),
+        ("stale libs",  check_needrestart),
     ]
 
 
