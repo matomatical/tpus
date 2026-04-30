@@ -64,11 +64,10 @@ fi
 # every libtpu instance binds the default 8431 and the kernel SO_REUSEPORTs
 # them: a single monitoring client gets hash-routed to one listener, opaque
 # to which chip it is. Explicit ports let the heartbeat collector enumerate
-# chips deterministically. Skip if the caller already set the flag.
+# chips deterministically. Always append — libtpu is last-wins on repeated
+# flags, so this overrides tpu-defaults.sh's default-chip-0 port for non-zero
+# devices and multi-device launches.
 FIRST_DEV=${DEVICE_IDS%%,*}
-# Match the flag regardless of -/-- prefix or =/space separator.
-if [[ "$LIBTPU_INIT_ARGS" != *runtime_metric_service_port* ]]; then
-    export LIBTPU_INIT_ARGS="${LIBTPU_INIT_ARGS:+$LIBTPU_INIT_ARGS }--runtime_metric_service_port=$((8431 + FIRST_DEV))"
-fi
+export LIBTPU_INIT_ARGS="${LIBTPU_INIT_ARGS:+$LIBTPU_INIT_ARGS }--runtime_metric_service_port=$((8431 + FIRST_DEV))"
 
 exec "$@"

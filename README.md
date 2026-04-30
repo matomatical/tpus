@@ -109,6 +109,8 @@ Major feature: Persistent shared storage
 TPU monitoring improvements
 
 * [x] upgrade tpups with memory/processor utilisation
+* [x] tpu-device: always pin per-chip metrics port (was tripping on
+  tpu-defaults' default flag, leaving multi-launches collided on 8431).
 * [ ] also tensorcore utilization?
 * [ ] time series for active processing
 * [ ] web dashboard for tpups, usage, heatmap, recent history of metrics
