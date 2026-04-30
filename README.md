@@ -61,8 +61,9 @@ April 2026, feature upgrades:
 * [x] Inter-VM SSH configured by default for all users.
 * [x] `tpups` in MOTD.
 * [x] tpu-device: CPU mode (`tpu-device cpu`) for JAX and PyTorch/XLA.
-* [x] tpups: fail gracefully when servers are unreachable, speed improvements
-* [x] tpups: --watch variant for live reloading, dynamic columns
+* [x] tpups: fail gracefully when servers are unreachable, speed improvements.
+* [x] tpups: --watch variant for live reloading, dynamic table width, dynamic
+  column widths, ANSI colours and unicode rules.
 
 April 2026, backend stability improvements:
 

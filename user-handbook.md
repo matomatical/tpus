@@ -362,30 +362,33 @@ TPUs. From any node, simply run the command `tpups` (short for "**tpu**
 that looks something like this:
 
 ```
-TPU     USER    PID      TIME       MEM DUT COMMAND
---------------------------------------------------------------------------------
-*tpu0.0
-*tpu0.1
-*tpu0.2
-*tpu0.3
---------------------------------------------------------------------------------
- tpu1.0 ross    1561589  01:06       12  73 python train_new.py --task-diversi…
- tpu1.1 ross    1541262  18:31       12  74 python train_new.py --task-diversi…
- tpu1.2 olly    1525067  32:22        2  99 /home/olly/slt-for-cl/.venv/bin/py…
- tpu1.3 olly    1528223  30:57        2  99 /home/olly/slt-for-cl/.venv/bin/py…
---------------------------------------------------------------------------------
- tpu2.0 matt    377715   3-12:24:58  45  88 venv/bin/python simplex2b.py --siz…
- tpu2.1 matt    377715   3-12:24:58  45  88 venv/bin/python simplex2b.py --siz…
- tpu2.2 matt    377715   3-12:24:58  45  88 venv/bin/python simplex2b.py --siz…
- tpu2.3 matt    377715   3-12:24:58  45  88 venv/bin/python simplex2b.py --siz…
---------------------------------------------------------------------------------
- tpu3.0 matt    349567   3-12:26:57  45  86 venv/bin/python simplex2b.py --siz…
- tpu3.1 matt    349567   3-12:26:57  45  86 venv/bin/python simplex2b.py --siz…
- tpu3.2 matt    349567   3-12:26:57  45  86 venv/bin/python simplex2b.py --siz…
- tpu3.3 matt    349567   3-12:26:57  45  86 venv/bin/python simplex2b.py --siz…
---------------------------------------------------------------------------------
-* = current node | MEM/DUT = HBM/duty % | Updates ago: tpu0:4s, tpu1:2s, …
+chip user pid     time       mem dut command
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+*0.0 idle
+*0.1 idle
+*0.2 idle
+*0.3 idle
+────────────────────────────────────────────────────────────────────────────────
+ 1.0 ross 1561589 01:06       12  73 python train_new.py --task-diversity 1…
+ 1.1 ross 1541262 18:31       12  74 python train_new.py --task-diversity 1…
+ 1.2 olly 1525067 32:22        2  99 /home/olly/slt-for-cl/.venv/bin/python…
+ 1.3 olly 1528223 30:57        2  99 /home/olly/slt-for-cl/.venv/bin/python…
+────────────────────────────────────────────────────────────────────────────────
+ 2.0 matt 377715  3-12:24:58  45  88 venv/bin/python simplex2b.py --size 1…
+ 2.1 matt 377715  3-12:24:58  45  88 venv/bin/python simplex2b.py --size 1…
+ 2.2 matt 377715  3-12:24:58  45  88 venv/bin/python simplex2b.py --size 1…
+ 2.3 matt 377715  3-12:24:58  45  88 venv/bin/python simplex2b.py --size 1…
+────────────────────────────────────────────────────────────────────────────────
+ 3.0 matt 349567  3-12:26:57  45  86 venv/bin/python simplex2b.py --size 1…
+ 3.1 matt 349567  3-12:26:57  45  86 venv/bin/python simplex2b.py --size 1…
+ 3.2 matt 349567  3-12:26:57  45  86 venv/bin/python simplex2b.py --size 1…
+ 3.3 matt 349567  3-12:26:57  45  86 venv/bin/python simplex2b.py --size 1…
+────────────────────────────────────────────────────────────────────────────────
+* = current node | mem/dut = HBM/duty % | Updates ago: tpu0:4s, tpu1:2s, …
 ```
+
+In your terminal, chip IDs are coloured: green for idle chips, gold for busy
+chips, red for any node whose status could not be reached.
 
 Here you can see:
 
@@ -394,28 +397,31 @@ Here you can see:
   using two devices on `tpu1`.
 * You are calling `tpups` from `tpu0`, as indicated by the `*` next to those
   devices.
-* All four devices on `tpu0` are free (rows are blank apart from the chip
-  label — only busy chips show occupant data).
-* `MEM` and `DUT` show how each user's job is using the chip:
-  - `MEM` = HBM (high-bandwidth memory) currently used, as a percentage of
+* All four devices on `tpu0` are free (rows show `idle` in the user column —
+  only busy chips show occupant data).
+* `mem` and `dut` show how each user's job is using the chip:
+  - `mem` = HBM (high-bandwidth memory) currently used, as a percentage of
     32 GiB. Tells you whether a job is memory-light or near capacity.
-  - `DUT` = duty cycle %: roughly the fraction of recent time the TPU was
+  - `dut` = duty cycle %: roughly the fraction of recent time the TPU was
     executing work. Tells you whether a job is keeping the chip busy or
     bottlenecked elsewhere (host code, I/O, gradient sync). Closer to 100%
     means more effective use of the TPU's compute.
-* Blank `MEM`/`DUT` cells with a user/PID filled in mean the job has just
+* Blank `mem`/`dut` cells with a user/PID filled in mean the job has just
   started and metrics haven't flowed yet (~5–10s warm-up), or it just exited.
 * This information was current as of a few seconds ago (the information
   refreshes every 5 seconds; if you see substantially longer times, this
   indicates an error, please let me know).
 
-`tpups` also supports a couple of flags:
+`tpups` also supports a few flags:
 
 * `tpups --watch` (or `-w`) refreshes the view every 5 seconds in place —
-  handy for watching `MEM`/`DUT` move while a job warms up. Use `-n SECONDS`
+  handy for watching `mem`/`dut` move while a job warms up. Use `-n SECONDS`
   to tune the refresh interval. Ctrl-C exits.
-* `tpups --full` disables the `…` truncation on the `COMMAND` column, so you
+* `tpups --full` disables the `…` truncation on the `command` column, so you
   can see the full argv. Lines may overflow your terminal width.
+* `tpups --no-color` disables ANSI styling and the box-drawing separators —
+  useful when piping into a script or pasting into a chat with an AI
+  assistant. The `NO_COLOR` environment variable has the same effect.
 
 Two related tools:
 
