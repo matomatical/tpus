@@ -1,0 +1,22 @@
+Loading ross /home (tpu0) and /storage/home/ross ...
+src files = 72058
+dst files = 75754
+missing-in-dst = 3024
+only-in-dst    = 6720
+migration cutoff = 2026-04-24 21:42:00
+
+  pre-migration  missing files: 3022
+  post-migration missing files: 2
+
+  Missing-in-dst by top-level entry:
+      2734    247.8MiB  .vscode-server
+       290      6.1MiB  projects
+
+  only-in-dst by top-level entry (these are EXPECTED for new work):
+      6429    814.3MiB  .vscode-server
+       288      6.0MiB  projects
+         3    227.2KiB  .dotnet
+
+  All 2 POST-migration missing files (oldest first):
+    2026-04-29 23:04:55         31305  projects/myproject/plot_new5.py
+    2026-04-29 23:08:04         43977  projects/myproject/Old Stuff/my_plot23.pdf

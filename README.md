@@ -105,6 +105,8 @@ Major feature: Persistent shared storage
 * [x] Validate and automate juicefs redis database backups.
 * [x] Weekly `juicefs gc --compact`; manual `gc` and `fsck` baseline clean.
 * [x] `tpu-health`: `gc timer` and `gc fresh` rows for the weekly compact job.
+* [x] Migration cleanup: per-node `/home/<u>` backups deleted (~114 GiB freed),
+  uv-cache and venv-python symlinks repointed to `/storage` paths.
 
 TPU monitoring improvements
 

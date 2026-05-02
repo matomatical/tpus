@@ -1,0 +1,109 @@
+
+========================================================================
+User: afiq
+========================================================================
+
+  tpu0: src=108874 dst=108874 missing=0 storage_older_than_home=0 size_differ=0
+
+  tpu1: src=78043 dst=78043 missing=0 storage_older_than_home=0 size_differ=0
+
+  tpu2: src=94539 dst=94539 missing=0 storage_older_than_home=0 size_differ=0
+
+  tpu3: src=33653 dst=33653 missing=0 storage_older_than_home=0 size_differ=0
+
+========================================================================
+User: ross
+========================================================================
+
+  tpu0: src=72058 dst=75754 missing=3024 storage_older_than_home=0 size_differ=4
+    missing mtime span: 2024-07-25 00:23:08 .. 2026-04-29 23:08:04
+    Missing files (up to 50, oldest mtime first):
+      2024-07-25 00:23:08          1141  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/LICENSE.txt
+      2024-07-25 00:23:08          2824  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/SECURITY.md
+      2024-07-25 00:23:08           833  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/ci.yml
+      2024-07-25 00:23:08           176  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/eslint.config.mjs
+      2024-07-25 00:23:08          8177  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/resources/logo.png
+      2024-07-25 00:24:50         66758  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/ThirdPartyNotices.txt
+      2024-07-25 00:25:38          1303  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/package.json
+      2024-07-25 00:25:48          1088  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/README.md
+      2024-07-25 00:25:48        100521  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/out/extension.js
+      2024-09-26 03:59:46           944  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/ci.yml
+      2024-09-26 03:59:46          4462  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/resources/icon.png
+      2024-09-26 04:01:00          9511  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/out/425.heapsnapshotWorker.js
+      2024-09-26 04:01:00        180756  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/out/a443ca1a33b96237dd48.module.wasm
+      2024-09-26 04:01:00          3505  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/out/heapsnapshotWorker.js
+      2024-09-26 04:01:04          9172  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/out/848.extension.web.js
+      2024-09-26 04:01:04         42207  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/out/cpu-client.bundle.js
+      2024-09-26 04:01:04        180767  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/out/dbd61d846b1102299709.module.wasm
+      2024-09-26 04:01:04         17970  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/out/extension.js
+      2024-09-26 04:01:04         26047  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/out/extension.web.js
+      2024-09-26 04:01:04         43475  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/out/heapsnapshot-client.bundle.js
+      2024-09-26 04:01:06         42283  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/out/heap-client.bundle.js
+      2024-09-26 04:01:52       1855417  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/ThirdPartyNotices.txt
+      2024-09-26 04:02:30          1787  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/package.json
+      2024-09-26 04:02:32            67  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/tsconfig.browser.json
+      2024-09-26 04:02:40           441  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.vscode-js-profile-table/README.md
+      2025-06-10 19:03:16       5287640  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/node_modules/@vscode/ripgrep/bin/rg
+      2025-10-02 00:40:54          1183  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/LICENSE.txt
+      2025-10-02 00:40:54         10157  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/dark/configure.svg
+      2025-10-02 00:40:54          1626  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/dark/connect.svg
+      2025-10-02 00:40:54          2134  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/dark/disconnect.svg
+      2025-10-02 00:40:54           517  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/dark/node.svg
+      2025-10-02 00:40:54           796  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/dark/open-file.svg
+      2025-10-02 00:40:54          1173  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/dark/page.svg
+      2025-10-02 00:40:54           174  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/dark/pause.svg
+      2025-10-02 00:40:54           533  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/dark/restart.svg
+      2025-10-02 00:40:54           299  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/dark/resume.svg
+      2025-10-02 00:40:54          4462  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/dark/service-worker.svg
+      2025-10-02 00:40:54           194  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/dark/stop-profiling.svg
+      2025-10-02 00:40:54           196  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/dark/stop.svg
+      2025-10-02 00:40:54          2506  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/dark/worker.svg
+      2025-10-02 00:40:54         10157  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/light/configure.svg
+      2025-10-02 00:40:54          1627  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/light/connect.svg
+      2025-10-02 00:40:54          2134  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/light/disconnect.svg
+      2025-10-02 00:40:54           517  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/light/node.svg
+      2025-10-02 00:40:54           796  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/light/open-file.svg
+      2025-10-02 00:40:54          1167  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/light/page.svg
+      2025-10-02 00:40:54           173  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/light/pause.svg
+      2025-10-02 00:40:54           533  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/light/restart.svg
+      2025-10-02 00:40:54           299  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/light/resume.svg
+      2025-10-02 00:40:54          4450  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/light/service-worker.svg
+      ... and 2974 more
+    size differs (sample, up to 20):
+      home=      923040  storage=     1125640  .vscode-server/data/CachedProfilesData/__default__profile__/extensions.builtin.cache
+      home=         201  storage=         251  .vscode-server/cli/servers/lru.json
+      home=         554  storage=         578  .vscode-server/data/CachedProfilesData/__default__profile__/extensions.user.cache
+      home=       15228  storage=       15688  .bash_history
+
+  tpu1: src=74939 dst=74936 missing=3 storage_older_than_home=0 size_differ=0
+    missing mtime span: 2026-04-29 00:05:24 .. 2026-04-29 00:10:46
+    Missing files (up to 50, oldest mtime first):
+      2026-04-29 00:05:24         44691  projects/myproject/my_plot21.pdf
+      2026-04-29 00:10:18         31353  projects/myproject/plot_new5.py
+      2026-04-29 00:10:46         44638  projects/myproject/my_plot22.pdf
+
+  tpu2: src=17441 dst=17441 missing=0 storage_older_than_home=0 size_differ=0
+
+  tpu3: src=60152 dst=60152 missing=0 storage_older_than_home=0 size_differ=0
+
+========================================================================
+User: olly
+========================================================================
+
+  tpu0: src=21399 dst=22187 missing=0 storage_older_than_home=0 size_differ=9
+    size differs (sample, up to 20):
+      home=         827  storage=        1020  projects/slt-for-cl/.git/logs/HEAD
+      home=         606  storage=         799  projects/slt-for-cl/.git/logs/refs/heads/olly
+      home=       10179  storage=       13095  projects/slt-for-cl/train_prior_tracking.py
+      home=         386  storage=         579  projects/slt-for-cl/.git/logs/refs/remotes/origin/olly
+      home=        7036  storage=        8036  projects/slt-for-cl/.git/index
+      home=       67004  storage=       67171  projects/slt-for-cl/__pycache__/iclr.cpython-312.pyc
+      home=         814  storage=         821  projects/slt-for-cl/.git/FETCH_HEAD
+      home=       66031  storage=       66197  projects/slt-for-cl/iclr.py
+      home=        1604  storage=        2435  .bash_history
+
+  tpu1: src=32545 dst=32545 missing=0 storage_older_than_home=0 size_differ=0
+
+  tpu2: src=24985 dst=24985 missing=0 storage_older_than_home=0 size_differ=0
+
+  tpu3: src=22577 dst=22577 missing=0 storage_older_than_home=0 size_differ=0

@@ -1,0 +1,65 @@
+File counts:
+  /storage/home/ross/projects = 29800
+  /storage/home/ross/tpu1/projects = 44043
+  /storage/home/ross/tpu2/projects = 14368
+  /storage/home/ross/tpu3/projects = 11984
+  /home/ross/projects on tpu0 = 29802
+  /home/ross/projects on tpu1 = 44046
+  /home/ross/projects on tpu2 = 14368
+  /home/ross/projects on tpu3 = 11984
+
+=== tpu0: /home/ross/projects vs /storage/home/ross/projects ===
+  missing-in-storage = 290
+    pre-migration:  288
+    post-migration: 2
+    by project:
+       290      6.10 MiB  myproject
+    Sample (oldest 30):
+      2026-02-12 17:14:22        3737  myproject/Old Stuff/analyse.py
+      2026-02-12 17:14:23        6596  myproject/Old Stuff/bayes.py
+      2026-02-12 17:14:23        9489  myproject/Old Stuff/dynamics.py
+      2026-02-12 17:14:24       32362  myproject/Old Stuff/iclr.py
+      2026-02-12 17:14:24       39311  myproject/Old Stuff/iclr_dirichlet.py
+      2026-02-12 17:14:25          88  myproject/Old Stuff/main.py
+      2026-02-12 17:14:26        2392  myproject/Old Stuff/mala.py
+      2026-02-12 17:14:26        9246  myproject/Old Stuff/plot_dirichlet.py
+      2026-02-12 17:14:27       12697  myproject/Old Stuff/plot_test_train_error_vs_task_diversity.py
+      2026-02-12 17:14:34        4996  myproject/Old Stuff/strux.py
+      2026-02-12 17:55:17       41235  myproject/Old Stuff/iclr_deltas.py
+      2026-02-12 18:02:56       22884  myproject/Old Stuff/plot_deltas.py
+      2026-02-12 19:33:49         112  myproject/Old Stuff/logs2/job-06u11k9h.out
+      2026-02-12 19:33:49         112  myproject/Old Stuff/logs2/job-j3t9mahu.out
+      2026-02-12 19:33:49         112  myproject/Old Stuff/logs2/job-1iok8h19.out
+      2026-02-12 19:33:49         112  myproject/Old Stuff/logs2/job-bt88yksd.out
+      2026-02-12 19:33:54         112  myproject/Old Stuff/logs2/job-k81nan5r.out
+      2026-02-12 19:33:54         112  myproject/Old Stuff/logs2/job-zz68r8xz.out
+      2026-02-12 19:33:54         112  myproject/Old Stuff/logs2/job-stjyl46i.out
+      2026-02-12 19:33:54         112  myproject/Old Stuff/logs2/job-33u0bwsq.out
+      2026-02-12 19:33:59         112  myproject/Old Stuff/logs2/job-1x398wuw.out
+      2026-02-12 19:33:59         112  myproject/Old Stuff/logs2/job-s7is3mxi.out
+      2026-02-12 19:33:59         112  myproject/Old Stuff/logs2/job-nna6zsvo.out
+      2026-02-12 19:33:59         112  myproject/Old Stuff/logs2/job-jqptjtx1.out
+      2026-02-12 19:34:04         112  myproject/Old Stuff/logs2/job-r92ak1ew.out
+      2026-02-12 19:34:04         112  myproject/Old Stuff/logs2/job-o7m7xjd1.out
+      2026-02-12 19:34:04         112  myproject/Old Stuff/logs2/job-gskukd39.out
+      2026-02-12 19:34:04         112  myproject/Old Stuff/logs2/job-te97rmu6.out
+      2026-02-12 19:34:09         112  myproject/Old Stuff/logs2/job-o7aimij3.out
+      2026-02-12 19:34:09         112  myproject/Old Stuff/logs2/job-ckn9dw6p.out
+      ... and 260 more
+    All post-migration (2):
+      2026-04-29 23:04:55       31305  myproject/plot_new5.py
+      2026-04-29 23:08:04       43977  myproject/Old Stuff/my_plot23.pdf
+
+=== tpu1: /home/ross/projects vs /storage/home/ross/tpu1/projects ===
+  missing-in-storage = 3
+    pre-migration:  0
+    post-migration: 3
+      2026-04-29 00:05:24       44691  myproject/my_plot21.pdf
+      2026-04-29 00:10:18       31353  myproject/plot_new5.py
+      2026-04-29 00:10:46       44638  myproject/my_plot22.pdf
+
+=== tpu2: /home/ross/projects vs /storage/home/ross/tpu2/projects ===
+  missing-in-storage = 0
+
+=== tpu3: /home/ross/projects vs /storage/home/ross/tpu3/projects ===
+  missing-in-storage = 0

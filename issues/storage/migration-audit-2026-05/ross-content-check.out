@@ -1,0 +1,95 @@
+missing paths (path-based): 3024
+  -> POST-migration writes to /home (genuinely never copied): 2
+  -> moved within /storage (content found at different path): 377
+  -> truly missing (no content match in /storage): 2645
+
+Sample of 'moved' files (src path -> /storage candidate):
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/LICENSE.txt
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug-companion/LICENSE.txt
+     -> /storage/.../.vscode-server/cli/servers/Stable-ce099c1ed25d9eb3076c11e4a280f3eb52b4fbeb/server/extensions/ms-vscode.js-debug-companion/LICENSE.txt
+     ... and 3 more candidates
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/README.md
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug-companion/README.md
+     -> /storage/.../.vscode-server/cli/servers/Stable-ce099c1ed25d9eb3076c11e4a280f3eb52b4fbeb/server/extensions/ms-vscode.js-debug-companion/README.md
+     ... and 3 more candidates
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/SECURITY.md
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug-companion/SECURITY.md
+     -> /storage/.../.vscode-server/cli/servers/Stable-ce099c1ed25d9eb3076c11e4a280f3eb52b4fbeb/server/extensions/ms-vscode.js-debug-companion/SECURITY.md
+     ... and 3 more candidates
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/ThirdPartyNotices.txt
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug-companion/ThirdPartyNotices.txt
+     -> /storage/.../.vscode-server/cli/servers/Stable-ce099c1ed25d9eb3076c11e4a280f3eb52b4fbeb/server/extensions/ms-vscode.js-debug-companion/ThirdPartyNotices.txt
+     ... and 3 more candidates
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/ci.yml
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug-companion/ci.yml
+     -> /storage/.../.vscode-server/cli/servers/Stable-ce099c1ed25d9eb3076c11e4a280f3eb52b4fbeb/server/extensions/ms-vscode.js-debug-companion/ci.yml
+     ... and 3 more candidates
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/eslint.config.mjs
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug-companion/eslint.config.mjs
+     -> /storage/.../.vscode-server/cli/servers/Stable-ce099c1ed25d9eb3076c11e4a280f3eb52b4fbeb/server/extensions/ms-vscode.js-debug-companion/eslint.config.mjs
+     ... and 3 more candidates
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/out/extension.js
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug-companion/out/extension.js
+     -> /storage/.../.vscode-server/cli/servers/Stable-ce099c1ed25d9eb3076c11e4a280f3eb52b4fbeb/server/extensions/ms-vscode.js-debug-companion/out/extension.js
+     ... and 3 more candidates
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/package.json
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug-companion/package.json
+     -> /storage/.../.vscode-server/cli/servers/Stable-ce099c1ed25d9eb3076c11e4a280f3eb52b4fbeb/server/extensions/ms-vscode.js-debug-companion/package.json
+     ... and 3 more candidates
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug-companion/resources/logo.png
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug-companion/resources/logo.png
+     -> /storage/.../.vscode-server/cli/servers/Stable-ce099c1ed25d9eb3076c11e4a280f3eb52b4fbeb/server/extensions/ms-vscode.js-debug-companion/resources/logo.png
+     ... and 3 more candidates
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/LICENSE.txt
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug/LICENSE.txt
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/ThirdPartyNotices.txt
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug/ThirdPartyNotices.txt
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/package.json
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug/package.json
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/package.nls.json
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug/package.nls.json
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/readme.md
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug/readme.md
+  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/ms-vscode.js-debug/resources/dark/configure.svg
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug/resources/dark/configure.svg
+     -> /storage/.../.vscode-server/cli/servers/Stable-b6a47e94e326b5c209d118cf0f994d6065585705/server/extensions/ms-vscode.js-debug/resources/light/configure.svg
+
+POST-migration writes to /home/ross (potentially lost work):
+  2026-04-29 23:04:55       31305  projects/myproject/plot_new5.py
+  2026-04-29 23:08:04       43977  projects/myproject/Old Stuff/my_plot23.pdf
+
+TRULY missing files (size+mtime not in /storage, sample 30):
+  2026-02-10 20:14:31       27888  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/_tsserver.js
+  2026-02-10 20:14:31       10363  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/_typingsInstaller.js
+  2026-02-10 20:14:31      320453  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/cs/diagnosticMessages.generated.json
+  2026-02-10 20:14:31      344426  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/de/diagnosticMessages.generated.json
+  2026-02-10 20:14:31      340054  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/es/diagnosticMessages.generated.json
+  2026-02-10 20:14:31      346016  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/fr/diagnosticMessages.generated.json
+  2026-02-10 20:14:31      339409  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/it/diagnosticMessages.generated.json
+  2026-02-10 20:14:31      381398  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/ja/diagnosticMessages.generated.json
+  2026-02-10 20:14:31      346139  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/ko/diagnosticMessages.generated.json
+  2026-02-10 20:14:31         992  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.d.ts
+  2026-02-10 20:14:31       13192  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.decorators.d.ts
+  2026-02-10 20:14:31        1326  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.decorators.legacy.d.ts
+  2026-02-10 20:14:31        1887  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.dom.asynciterable.d.ts
+  2026-02-10 20:14:31     1874901  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.dom.d.ts
+  2026-02-10 20:14:31       29802  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.dom.iterable.d.ts
+  2026-02-10 20:14:31        5229  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2015.collection.d.ts
+  2026-02-10 20:14:31       22866  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2015.core.d.ts
+  2026-02-10 20:14:31        1241  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2015.d.ts
+  2026-02-10 20:14:31        2557  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2015.generator.d.ts
+  2026-02-10 20:14:31       18200  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2015.iterable.d.ts
+  2026-02-10 20:14:31        3200  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2015.promise.d.ts
+  2026-02-10 20:14:31        5251  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2015.proxy.d.ts
+  2026-02-10 20:14:31        6493  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2015.reflect.d.ts
+  2026-02-10 20:14:31        1649  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2015.symbol.d.ts
+  2026-02-10 20:14:31       11010  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2015.symbol.wellknown.d.ts
+  2026-02-10 20:14:31        5204  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2016.array.include.d.ts
+  2026-02-10 20:14:31         965  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2016.d.ts
+  2026-02-10 20:14:31        1032  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2016.full.d.ts
+  2026-02-10 20:14:31        1484  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2016.intl.d.ts
+  2026-02-10 20:14:31         915  .vscode-server/cli/servers/Stable-591199df409fbf59b4b52d5ad4ee0470152a9b31/server/extensions/node_modules/typescript/lib/lib.es2017.arraybuffer.d.ts
+  ... and 2615 more
+
+  truly-missing by top-level entry:
+     2645  .vscode-server
