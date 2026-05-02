@@ -111,9 +111,9 @@ TPU monitoring improvements
 * [x] upgrade tpups with memory/processor utilisation
 * [x] tpu-device: always pin per-chip metrics port (was tripping on
   tpu-defaults' default flag, leaving multi-launches collided on 8431).
+* [x] tpu-dashboard: live tpups + HBM/duty time-series web UI on tpu0:8082.
 * [ ] also tensorcore utilization?
-* [ ] time series for active processing
-* [ ] web dashboard for tpups, usage, heatmap, recent history of metrics
+* [ ] add tpups / usage / heatmap views into tpu-dashboard
 * [ ] public web dashboard (rather than ssh port forward)
 
 Major feature: TPU queueing system (prerequisite, persistent shared storage)

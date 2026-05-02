@@ -429,6 +429,20 @@ Two related tools:
   who has been using the most chip-time.
 * `tpu-heatmap` — shows a calendar heatmap of daily cluster utilisation.
 
+There is also a small **web dashboard** that combines a live
+`tpups`-style table with time-series plots of HBM usage and duty cycle
+per chip across the cluster (selectable 1m / 10m / 1h / 6h / 24h
+windows, kept in memory). It runs on `tpu0` and is reached via SSH port
+forward — from your laptop:
+
+```
+ssh -L 8082:localhost:8082 tpu0
+```
+
+then open <http://localhost:8082/> in your browser. The page polls
+every 5 seconds, so you can leave it open while a job warms up to watch
+`mem`/`dut` move in real time.
+
 I included these because I want you to feel encouraged to run a lot of
 experiments. Let's keep the TPUs warm!
 

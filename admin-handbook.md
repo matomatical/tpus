@@ -333,6 +333,67 @@ bootstrap loop above with new pins and `sudo systemctl restart
 tpu-metrics.service` on each VM. The lockfile at
 `/opt/tpu-metrics.venv/requirements.txt` is the audit record.
 
+## TPU dashboard
+
+`tpu-dashboard.service` runs on **tpu0 only**. It polls each VM's
+`tpu-heartbeat-web` (`http://tpu{0..3}:8080/{status,metrics}.json`) every
+5s in parallel and serves an HTML page (vendored uPlot) plus a JSON API
+on port `8082`. Stdlib only, no venv. The page shows:
+
+* a live `tpups`-style table of per-chip occupancy + HBM% + duty%, and
+* HBM and duty-cycle time-series plots for every chip across the
+  cluster (selectable 1m / 10m / 1h / 6h / 24h windows).
+
+The dashboard keeps a 24h rolling history of HBM and duty per chip in
+memory. To keep all 16 chips on a shared X axis (so charts render with
+contiguous lines), each poll cycle stamps every chip with the
+dashboard's poll timestamp rather than the upstream sidecar's
+`last_updated`; stale upstreams record `(ts, None, None)` gap sentinels.
+
+Port `8082` was chosen because `8081` is informally claimed by user
+`python -m http.server` instances in the wild on this cluster. Users
+reach the dashboard via `ssh -L 8082:localhost:8082 tpu0`.
+
+History is **in-memory only** — a service restart wipes it. Acceptable
+because this is a convenience tool, not telemetry of record. The first
+data point appears within ~5s of startup, the chart fills out
+progressively over the 24h window.
+
+The vendored uPlot files in `shared-scripts/dashboard/` are pinned at
+release `1.6.32` from
+[cdn.jsdelivr.net/npm/uplot@1.6.32/dist/](https://cdn.jsdelivr.net/npm/uplot@1.6.32/).
+SHA256s:
+
+```
+19c8d4c6ad88929a79f4ae49d6f7161566dfd0ba3d15cc495e974f787eb78f1f  uPlot.iife.min.js
+df630c6a8d6f8eeaff264b50f73ce5b114f646ffd9a0bb74f049b0a00135fa04  uPlot.min.css
+```
+
+To re-vendor on upgrade, replace these with new files and update the
+hashes here.
+
+Install (tpu0 only — no cluster-wide loop):
+
+```
+sudo install -d -m 755 /home/shared/dashboard
+sudo install -m 755 shared-scripts/dashboard/tpu-dashboard.py /home/shared/dashboard/
+sudo install -m 644 \
+    shared-scripts/dashboard/index.html \
+    shared-scripts/dashboard/uPlot.iife.min.js \
+    shared-scripts/dashboard/uPlot.min.css \
+    /home/shared/dashboard/
+sudo install -m 644 conf/tpu-dashboard.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now tpu-dashboard.service
+```
+
+(Run from `/home/matt/tpus/` on tpu0. No `scp` since deployment is
+local-only — tpu0 is the only target.)
+
+To verify: `curl -s http://localhost:8082/api/timeseries?since=0 | jq
+'.nodes'` should show all four nodes with `stale: false` once the
+poller has had ~10s to do its first round.
+
 ## Installing user handbook
 
 `user-handbook.md` is deployed to `/usr/local/share/doc/tpus/user-handbook.md`

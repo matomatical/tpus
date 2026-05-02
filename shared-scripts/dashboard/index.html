@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TPU dashboard</title>
+<link rel="stylesheet" href="/assets/uPlot.min.css">
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    margin: 1rem; background: #fafafa; color: #111;
+  }
+  h1 { font-size: 1.1rem; margin: 0 0 0.75rem 0; font-weight: 600; }
+  .controls {
+    display: flex; gap: 0.4rem; align-items: center;
+    margin-bottom: 0.75rem; flex-wrap: wrap;
+    font-size: 0.9rem;
+  }
+  .controls .label { color: #555; margin-right: 0.25rem; }
+  .controls button {
+    padding: 3px 10px; border: 1px solid #ccc; background: white;
+    cursor: pointer; font: inherit; border-radius: 3px;
+  }
+  .controls button.active { background: #333; color: white; border-color: #333; }
+  .controls .spacer { flex: 1; }
+  .controls .meta { color: #666; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.8rem; }
+  .chart {
+    background: white; border: 1px solid #ddd; border-radius: 3px;
+    padding: 6px; margin-bottom: 0.75rem;
+  }
+  .status {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.85rem;
+    background: white; border: 1px solid #ddd; border-radius: 3px;
+    padding: 8px 12px;
+  }
+  .status table { border-collapse: collapse; }
+  .status td { padding: 2px 14px 2px 0; }
+  .status .stale { color: #c0392b; }
+  .status .fresh { color: #1f7a3a; }
+  .status .err { color: #c0392b; font-style: italic; }
+
+  .table-wrap {
+    background: white; border: 1px solid #ddd; border-radius: 3px;
+    padding: 8px 0; margin-bottom: 0.75rem; overflow: hidden;
+  }
+  .table-wrap h2 {
+    font-size: 0.9rem; font-weight: 600; margin: 0 0 6px 12px;
+  }
+  table.tpups {
+    width: 100%; border-collapse: collapse;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.85rem;
+    table-layout: fixed;
+  }
+  table.tpups th, table.tpups td {
+    padding: 3px 12px; text-align: left;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  table.tpups th {
+    color: #666; font-weight: 600; border-bottom: 1px solid #eee;
+  }
+  table.tpups td.num { text-align: right; }
+  table.tpups col.col-chip { width: 5em; }
+  table.tpups col.col-user { width: 7em; }
+  table.tpups col.col-pid { width: 8em; }
+  table.tpups col.col-time { width: 9em; }
+  table.tpups col.col-mem { width: 5em; }
+  table.tpups col.col-dut { width: 5em; }
+  /* col-command takes the remainder */
+  table.tpups tr.busy    td.chip { color: #b85a00; font-weight: 600; }
+  table.tpups tr.idle    td.chip { color: #1f7a3a; }
+  table.tpups tr.unknown td.chip { color: #c0392b; }
+  table.tpups tr.busy { background: #fffbf3; }
+  table.tpups tr.unknown { background: #fff4f4; }
+  table.tpups tr + tr.host-divider td {
+    border-top: 1px solid #eee;
+  }
+
+  .legend {
+    background: white; border: 1px solid #ddd; border-radius: 3px;
+    padding: 8px 12px; margin-bottom: 0.75rem;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.85rem;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 0.6rem; row-gap: 4px; align-items: center;
+  }
+  .legend .lg-header {
+    grid-column: 1 / -1; color: #666; font-size: 0.8rem;
+    margin-bottom: 2px;
+  }
+  .legend .lg-host { color: #555; font-weight: 600; }
+  .legend .lg-chips { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .legend .lg-chip {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+  }
+  .legend .lg-swatch {
+    display: inline-block; width: 14px; height: 3px; border-radius: 1px;
+  }
+</style>
+</head>
+<body>
+
+<h1>TPU cluster dashboard</h1>
+
+<div class="table-wrap">
+  <h2>Live cluster status</h2>
+  <table class="tpups" id="tpups">
+    <colgroup>
+      <col class="col-chip"><col class="col-user"><col class="col-pid">
+      <col class="col-time"><col class="col-mem"><col class="col-dut">
+      <col class="col-command">
+    </colgroup>
+    <thead>
+      <tr><th>chip</th><th>user</th><th>pid</th><th>time</th>
+        <th class="num">mem</th><th class="num">dut</th><th>command</th></tr>
+    </thead>
+    <tbody><tr><td colspan="7" style="color:#888">loading…</td></tr></tbody>
+  </table>
+</div>
+
+<div class="controls">
+  <span class="label">Window:</span>
+  <button data-window="60">1 m</button>
+  <button data-window="600">10 m</button>
+  <button data-window="3600">1 h</button>
+  <button data-window="21600">6 h</button>
+  <button data-window="86400">24 h</button>
+  <span class="spacer"></span>
+  <span class="meta" id="meta"></span>
+</div>
+
+<div id="chart-hbm" class="chart"></div>
+<div id="chart-dut" class="chart"></div>
+<div id="legend" class="legend"></div>
+<div id="status" class="status">loading…</div>
+
+<script src="/assets/uPlot.iife.min.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  const HOSTS = ["tpu0", "tpu1", "tpu2", "tpu3"];
+  const CHIPS_PER_NODE = 4;
+  const POLL_INTERVAL_MS = 5000;
+  const RETAIN_SEC = 86400;  // client-side trim — matches server retention
+
+  // 4 colour families × 4 saturations within each; node grouped, chip varied.
+  const NODE_COLOURS = {
+    tpu0: ["#0d4a90", "#2972c2", "#5a9bdc", "#a3c4e8"],  // blue
+    tpu1: ["#1f7a3a", "#2fa055", "#5dc480", "#a8e0bb"],  // green
+    tpu2: ["#a85a00", "#dd7d10", "#f2a23e", "#f7c98a"],  // amber
+    tpu3: ["#a31d1d", "#d6383a", "#e36c6f", "#f0a8a9"],  // red
+  };
+
+  // Default window in seconds.
+  let windowSec = 600;
+  // Initialised to wall-clock so the chart axis spans a sensible window even
+  // before the first /api/timeseries response lands.
+  let lastNow = Date.now() / 1000;
+
+  // series[host/chip] = sorted array of [ts, hbm_pct, duty_pct]
+  const series = {};
+  for (const h of HOSTS) for (let c = 0; c < CHIPS_PER_NODE; c++) {
+    series[`${h}/${c}`] = [];
+  }
+
+  // Highest server timestamp we've ingested — used as `since` for delta polls.
+  let maxTsSeen = 0;
+  let lastNodeStatus = null;
+
+  let plotHbm = null;
+  let plotDut = null;
+
+  // ----------------------------------------------------------------------
+  // Plot construction.
+
+  function seriesConfig() {
+    const out = [{}];  // X axis placeholder.
+    for (const host of HOSTS) {
+      for (let c = 0; c < CHIPS_PER_NODE; c++) {
+        out.push({
+          label: `${host}/${c}`,
+          stroke: NODE_COLOURS[host][c],
+          width: 1.4,
+          spanGaps: false,
+          points: { show: false },
+        });
+      }
+    }
+    return out;
+  }
+
+  function buildPlot(target, title, ymin, ymax) {
+    const opts = {
+      title: title,
+      width: target.clientWidth - 16,
+      height: 260,
+      cursor: {
+        drag: { x: true, y: false },
+        focus: { prox: 16 },
+        // Sync cursor across HBM and Duty plots so hovering one shows
+        // values on both in the legend.
+        sync: { key: "tpu-charts" },
+      },
+      focus: { alpha: 0.25 },
+      scales: {
+        x: {
+          time: true,
+          // Always render the full selected window — even when data is
+          // sparse (e.g. just-started service, or 24h view with 30s of
+          // history). uPlot calls this on every setData/setScale.
+          range: () => [lastNow - windowSec, lastNow],
+        },
+        y: { range: [ymin, ymax] },
+      },
+      axes: [
+        {},
+        { values: (u, ticks) => ticks.map(v => v + "%") },
+      ],
+      series: seriesConfig(),
+      // We render our own grouped legend below the charts (4 nodes ×
+      // 4 chips) and use setCursor hooks below to fill in live values
+      // on hover.
+      legend: { show: false },
+      hooks: {
+        setCursor: [onCursor],
+      },
+    };
+    const empty = [[], ...Array(HOSTS.length * CHIPS_PER_NODE).fill([])];
+    return new uPlot(opts, empty, target);
+  }
+
+  // ----------------------------------------------------------------------
+  // Data assembly.
+
+  function rebuild() {
+    // All 16 chips share the same timestamp sequence — the server stamps
+    // every chip in a poll cycle with the dashboard's shared `t`. So we
+    // can take the timestamps from any one chip and use the same array
+    // for all series; nulls in the value arrays render as gaps.
+    const cutoff = lastNow - windowSec;
+    const ref = series[`${HOSTS[0]}/0`];
+    const startIdx = lowerBound(ref, cutoff);
+    const xs = new Array(ref.length - startIdx);
+    for (let i = 0; i < xs.length; i++) xs[i] = ref[startIdx + i][0];
+
+    const hbmCols = [xs];
+    const dutCols = [xs];
+    for (const host of HOSTS) {
+      for (let c = 0; c < CHIPS_PER_NODE; c++) {
+        const rows = series[`${host}/${c}`];
+        const hbms = new Array(xs.length);
+        const duts = new Array(xs.length);
+        for (let i = 0; i < xs.length; i++) {
+          const r = rows[startIdx + i];
+          hbms[i] = r ? r[1] : null;
+          duts[i] = r ? r[2] : null;
+        }
+        hbmCols.push(hbms);
+        dutCols.push(duts);
+      }
+    }
+
+    plotHbm.setData(hbmCols);
+    plotDut.setData(dutCols);
+  }
+
+  // First index i such that arr[i][0] >= target.
+  function lowerBound(arr, target) {
+    let lo = 0, hi = arr.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (arr[mid][0] < target) lo = mid + 1; else hi = mid;
+    }
+    return lo;
+  }
+
+  // ----------------------------------------------------------------------
+  // Polling.
+
+  async function poll() {
+    const url = maxTsSeen > 0
+      ? `/api/timeseries?since=${maxTsSeen}`
+      : `/api/timeseries`;
+    let data;
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      data = await resp.json();
+    } catch (e) {
+      const meta = document.getElementById("meta");
+      meta.textContent = `poll failed: ${e.message}`;
+      return;
+    }
+    lastNow = data.now;
+    lastNodeStatus = data.nodes;
+    renderTable(data.status || {});
+
+    // Merge new samples in. Server returns entries with ts > since,
+    // so duplicates are not expected — but assert via maxTsSeen anyway.
+    for (const k in data.series) {
+      const buf = series[k] || (series[k] = []);
+      for (const row of data.series[k]) {
+        if (row[0] > maxTsSeen) maxTsSeen = row[0];
+        buf.push(row);
+      }
+      // Trim entries older than retention window.
+      const trimBefore = data.now - RETAIN_SEC;
+      while (buf.length && buf[0][0] < trimBefore) buf.shift();
+    }
+
+    renderStatus();
+    rebuild();
+    document.getElementById("meta").textContent =
+      `last poll: ${new Date().toLocaleTimeString()}`;
+  }
+
+  // ----------------------------------------------------------------------
+  // Live table (tpups equivalent).
+
+  function renderTable(status) {
+    const tbody = document.querySelector("#tpups tbody");
+    const rows = [];
+    for (const host of HOSTS) {
+      for (let c = 0; c < CHIPS_PER_NODE; c++) {
+        const k = `${host}/${c}`;
+        const s = status[k] || { state: "?" };
+        const isFirstOfHost = (c === 0 && host !== HOSTS[0]);
+        const divider = isFirstOfHost ? " host-divider" : "";
+        const chipLabel = `${host.replace("tpu", "")}.${c}`;
+        if (s.state === "BUSY") {
+          rows.push(`<tr class="busy${divider}">
+            <td class="chip">${chipLabel}</td>
+            <td>${escapeHtml(s.user || "-")}</td>
+            <td>${escapeHtml(s.pid || "-")}</td>
+            <td>${escapeHtml(s.time || "-")}</td>
+            <td class="num">${fmtPct(s.hbm_pct)}</td>
+            <td class="num">${fmtPct(s.duty_pct)}</td>
+            <td title="${escapeHtml(s.command || "")}">${escapeHtml(s.command || "-")}</td>
+          </tr>`);
+        } else if (s.state === "?") {
+          rows.push(`<tr class="unknown${divider}">
+            <td class="chip">${chipLabel}</td>
+            <td colspan="6">unknown (no status)</td>
+          </tr>`);
+        } else {
+          // FREE or EXIT — show one cell summarising state.
+          const label = s.state === "EXIT" ? "exited" : "idle";
+          rows.push(`<tr class="idle${divider}">
+            <td class="chip">${chipLabel}</td>
+            <td colspan="6">${label}</td>
+          </tr>`);
+        }
+      }
+    }
+    tbody.innerHTML = rows.join("");
+  }
+
+  function fmtPct(v) {
+    if (v == null) return "";
+    return Math.round(v) + "%";
+  }
+
+  // ----------------------------------------------------------------------
+  // Status footer.
+
+  function renderStatus() {
+    if (!lastNodeStatus) return;
+    const rows = HOSTS.map(h => {
+      const info = lastNodeStatus[h] || {};
+      const cls = info.stale ? "stale" : "fresh";
+      const age = info.last_updated
+        ? Math.max(0, Math.round(lastNow - info.last_updated)) + "s ago"
+        : "never seen";
+      const err = info.fetch_error
+        ? `<td class="err">${escapeHtml(info.fetch_error)}</td>`
+        : "<td></td>";
+      return `<tr>
+        <td><b>${h}</b></td>
+        <td class="${cls}">${age}</td>
+        ${err}
+      </tr>`;
+    });
+    document.getElementById("status").innerHTML = "<table>" + rows.join("") + "</table>";
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, ch => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
+    }[ch]));
+  }
+
+  // ----------------------------------------------------------------------
+  // Controls.
+
+  function setupControls() {
+    for (const btn of document.querySelectorAll(".controls button[data-window]")) {
+      btn.addEventListener("click", () => {
+        windowSec = parseInt(btn.dataset.window, 10);
+        for (const b of document.querySelectorAll(".controls button[data-window]")) {
+          b.classList.toggle("active", b === btn);
+        }
+        rebuild();
+      });
+    }
+    document.querySelector(`.controls button[data-window="${windowSec}"]`).classList.add("active");
+  }
+
+  function onResize() {
+    for (const [plot, target] of [
+      [plotHbm, document.getElementById("chart-hbm")],
+      [plotDut, document.getElementById("chart-dut")],
+    ]) {
+      if (plot && target) plot.setSize({ width: target.clientWidth - 16, height: 260 });
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // Init.
+
+  // Render the colour legend. If `hover` is non-null, its `ts` and per-chip
+  // values are folded into the chip labels so the legend doubles as the
+  // hover-tooltip display. (uPlot's built-in hover values are tied to its
+  // own legend, which we disabled in favour of this 4×4 grid layout.)
+  function renderLegend(hover) {
+    const target = document.getElementById("legend");
+    const parts = [];
+    if (hover) {
+      const dt = new Date(hover.ts * 1000);
+      parts.push(
+        `<div class="lg-header">${dt.toLocaleTimeString()} — HBM% / duty%</div>`
+      );
+    } else {
+      parts.push(
+        `<div class="lg-header">format: HBM% / duty% (hover charts for values)</div>`
+      );
+    }
+    for (let h = 0; h < HOSTS.length; h++) {
+      const host = HOSTS[h];
+      parts.push(`<span class="lg-host">${host}</span>`);
+      const chips = [];
+      for (let c = 0; c < CHIPS_PER_NODE; c++) {
+        const colour = NODE_COLOURS[host][c];
+        let extra = "";
+        if (hover) {
+          const v = hover.values[h * CHIPS_PER_NODE + c];
+          const hbm = v.hbm == null ? "—" : Math.round(v.hbm) + "%";
+          const dut = v.dut == null ? "—" : Math.round(v.dut) + "%";
+          extra = `: ${hbm} / ${dut}`;
+        }
+        chips.push(
+          `<span class="lg-chip">` +
+            `<span class="lg-swatch" style="background:${colour}"></span>` +
+            `chip ${c}${extra}` +
+          `</span>`
+        );
+      }
+      parts.push(`<span class="lg-chips">${chips.join("")}</span>`);
+    }
+    target.innerHTML = parts.join("");
+  }
+
+  // uPlot setCursor hook — fires on mouse move within either plot, and
+  // (via cursor.sync) on the sibling plot too. We read both plots' data
+  // arrays at the same idx since they share the X axis.
+  function onCursor(u) {
+    const idx = u.cursor.idx;
+    if (idx == null || !plotHbm || !plotDut) {
+      renderLegend(null);
+      return;
+    }
+    const ts = u.data[0][idx];
+    if (ts == null) {
+      renderLegend(null);
+      return;
+    }
+    const values = [];
+    for (let i = 0; i < HOSTS.length * CHIPS_PER_NODE; i++) {
+      values.push({
+        hbm: plotHbm.data[i + 1][idx],
+        dut: plotDut.data[i + 1][idx],
+      });
+    }
+    renderLegend({ ts, values });
+  }
+
+  function init() {
+    plotHbm = buildPlot(document.getElementById("chart-hbm"), "HBM %", 0, 100);
+    plotDut = buildPlot(document.getElementById("chart-dut"), "Duty cycle %", 0, 100);
+    renderLegend(null);
+    setupControls();
+    window.addEventListener("resize", onResize);
+    poll();
+    setInterval(poll, POLL_INTERVAL_MS);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>
