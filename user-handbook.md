@@ -150,18 +150,51 @@ access the cluster, add the following lines to the text file
 Host tpu0 tpu1 tpu2 tpu3
     IdentityFile ~/.ssh/mfr-tpu
     User USERNAME
+    ControlMaster auto
+    ControlPath ~/.ssh/cm-%r@%h:%p
+    ControlPersist 30m
 Host tpu0
     HostName 35.186.109.61
+    LocalForward 8082 localhost:8082
 Host tpu1
     HostName 35.186.93.73
+    ProxyJump tpu0
 Host tpu2
     HostName 173.255.125.97
+    ProxyJump tpu0
 Host tpu3
     HostName 35.186.140.33
+    ProxyJump tpu0
 ```
 
 After this, you can SSH into `tpuX` using the simple command `ssh tpuX`
 where `X` is 0, 1, 2, or 3.
+
+A few of these lines do more than basic auth setup; they're worth a
+brief explanation:
+
+* `ControlMaster auto` + `ControlPath` + `ControlPersist 30m`
+  multiplex repeat connections through a single SSH master, kept
+  alive for 30 minutes after your last session ends. So `ssh tpu1`
+  from a second terminal opens in well under a second, and any port
+  forward set up by an earlier session stays up while you flip
+  between terminals.
+* `LocalForward 8082 localhost:8082` (on `tpu0`) exposes the cluster
+  dashboard at <http://localhost:8082/> in your laptop browser
+  whenever you have an active (or recently-active) `tpu0` SSH
+  session. See [Checking TPU status](#checking-tpu-status) below.
+* `ProxyJump tpu0` (on `tpu1`/`tpu2`/`tpu3`) routes SSH to those
+  nodes through `tpu0`, so the dashboard tunnel works whichever node
+  you SSH to. As a side effect, this means `tpu0` must be reachable
+  for `ssh tpuN` to work — if `tpu0` is ever down while the others
+  are up, override with `ssh -o ProxyJump=none tpu1`.
+
+To explicitly close the multiplex master and any forwards (e.g. before
+the 30-minute idle timeout):
+
+```
+ssh -O exit tpu0
+```
 
 Note: These IP addresses might need to be updated from time to time. If
 the login command suddenly stops working, let me know and I will double
@@ -432,16 +465,12 @@ Two related tools:
 There is also a small **web dashboard** that combines a live
 `tpups`-style table with time-series plots of HBM usage and duty cycle
 per chip across the cluster (selectable 1m / 10m / 1h / 6h / 24h
-windows, kept in memory). It runs on `tpu0` and is reached via SSH port
-forward — from your laptop:
-
-```
-ssh -L 8082:localhost:8082 tpu0
-```
-
-then open <http://localhost:8082/> in your browser. The page polls
-every 5 seconds, so you can leave it open while a job warms up to watch
-`mem`/`dut` move in real time.
+windows, kept in memory). It runs on `tpu0`. Once you've set up the
+SSH config under [Accessing the VMs via SSH](#accessing-the-vms-via-ssh)
+above, the tunnel is opened automatically by any `ssh tpuN` session —
+just open <http://localhost:8082/> in your laptop browser. The page
+polls every 5 seconds, so you can leave it open while a job warms up
+to watch `mem`/`dut` move in real time.
 
 I included these because I want you to feel encouraged to run a lot of
 experiments. Let's keep the TPUs warm!
