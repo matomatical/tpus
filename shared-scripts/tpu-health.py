@@ -38,21 +38,40 @@ METRICS_URL = "http://localhost:9567/metrics"
 #   full:   sentence for sentence-per-check view
 
 
-def check_disk():
+def check_boot_disk_noncache(metrics, cache_cap):
+    """Boot-disk fullness, excluding space reserved for the JuiceFS cache.
+
+    Treats the storage.mount `cache-size=` as reserved (subtracted from total),
+    and the live `juicefs_blockcache_bytes` as cache-occupied (subtracted from
+    used). Answers "if the cache grows to its cap, how much room is left for
+    everything else?". Falls back to overall disk if cache geometry is unknown.
+    """
     st = os.statvfs("/")
     total = st.f_blocks * st.f_frsize
     free = st.f_bavail * st.f_frsize
-    pct = (total - free) / total * 100
-    free_gb = free / (1024 ** 3)
-    total_gb = total / (1024 ** 3)
-    if pct >= 90:
-        status = "CRIT"
-    elif pct >= 75:
-        status = "WARN"
-    else:
-        status = "OK"
+    used = total - free
+    cache_now = metrics.get("juicefs_blockcache_bytes") if metrics else None
+    if cache_cap is None or cache_now is None:
+        pct = used / total * 100 if total else 0.0
+        free_gib = free / (1024 ** 3)
+        total_gib = total / (1024 ** 3)
+        status = "CRIT" if pct >= 90 else "WARN" if pct >= 75 else "OK"
+        return status, f"{pct:.0f}%", \
+            f"non-cache disk: cache geometry unknown, " \
+            f"total disk {pct:.0f}% used ({free_gib:.0f} GiB free of {total_gib:.0f} GiB)"
+    nc_total = total - int(cache_cap)
+    nc_used = used - int(cache_now)
+    if nc_total <= 0:
+        return "WARN", "n/a", "non-cache disk: cache cap >= total disk?"
+    pct = max(0.0, nc_used / nc_total * 100)
+    nc_used_gib = nc_used / (1024 ** 3)
+    nc_total_gib = nc_total / (1024 ** 3)
+    cache_cap_gib = cache_cap / (1024 ** 3)
+    status = "CRIT" if pct >= 90 else "WARN" if pct >= 75 else "OK"
     return status, f"{pct:.0f}%", \
-        f"disk {pct:.0f}% used ({free_gb:.0f} GiB free of {total_gb:.0f} GiB)"
+        f"non-cache disk {pct:.0f}% used " \
+        f"({nc_used_gib:.0f} of {nc_total_gib:.0f} GiB; " \
+        f"cache cap {cache_cap_gib:.0f} GiB reserved)"
 
 
 def check_uptime():
@@ -536,25 +555,26 @@ def _colored(status, text, use_color):
     return f"{STATUS_COLORS.get(status, '')}{text}{RESET}"
 
 
-# Order of checks in output. lambdas close over live config fetched in run_local.
+# Order of checks in output, grouped by section. Lambdas close over live
+# config fetched in run_local.
 def _build_check_list(metrics, cache_cap):
     return [
-        ("disk",        check_disk),
-        ("uptime",      check_uptime),
-        ("heartbeat",   check_heartbeat),
-        ("services",    check_services),
-        ("healthAgent", check_healthagent),
-        ("storage",     check_storage_mount),
-        ("capacity",    check_storage_capacity),
-        ("cache",       lambda: check_cache_size(metrics, cache_cap)),
-        ("rawstaging",  lambda: check_rawstaging(metrics)),
-        ("GCS errors",  lambda: check_gcs_errors(metrics)),
-        ("redis",       check_redis_ping),
-        ("bk timer",    check_backup_timer),
-        ("bk fresh",    check_backup_freshness),
-        ("gc timer",    check_gc_timer),
-        ("gc fresh",    check_gc_freshness),
-        ("stale libs",  check_needrestart),
+        ("system",    "uptime",     check_uptime),
+        ("system",    "stale libs", check_needrestart),
+        ("boot disk", "non-cache",  lambda: check_boot_disk_noncache(metrics, cache_cap)),
+        ("boot disk", "cache",      lambda: check_cache_size(metrics, cache_cap)),
+        ("juicefs",   "storage",    check_storage_mount),
+        ("juicefs",   "capacity",   check_storage_capacity),
+        ("juicefs",   "rawstaging", lambda: check_rawstaging(metrics)),
+        ("juicefs",   "GCS errors", lambda: check_gcs_errors(metrics)),
+        ("juicefs",   "bk timer",   check_backup_timer),
+        ("juicefs",   "bk fresh",   check_backup_freshness),
+        ("juicefs",   "gc timer",   check_gc_timer),
+        ("juicefs",   "gc fresh",   check_gc_freshness),
+        ("services",  "heartbeat",  check_heartbeat),
+        ("services",  "services",   check_services),
+        ("services",  "healthAgent", check_healthagent),
+        ("redis",     "redis",      check_redis_ping),
     ]
 
 
@@ -563,17 +583,25 @@ def run_local():
     metrics = _scrape_metrics()
     cache_cap = _get_cache_cap_bytes()
     rows = []
-    for name, fn in _build_check_list(metrics, cache_cap):
+    for section, name, fn in _build_check_list(metrics, cache_cap):
         status, short, full = fn()
-        rows.append({"name": name, "status": status, "short": short, "full": full})
+        rows.append({"section": section, "name": name,
+                     "status": status, "short": short, "full": full})
     return rows
 
 
 def print_local(rows, use_color):
     print("Health:")
+    last_section = None
     for r in rows:
+        section = r.get("section", "")
+        if section != last_section:
+            if section:
+                print(f"{section}:")
+            last_section = section
         sym = _colored(r["status"], f"{r['status']:<4}", use_color)
-        print(f"  {sym}  {r['full']}")
+        indent = "  " if section else ""
+        print(f"{indent}  {sym}  {r['full']}")
 
 
 def fetch_remote(node, timeout=15):
@@ -601,12 +629,17 @@ def fetch_remote(node, timeout=15):
 
 def print_cluster_table(per_node, use_color):
     nodes = list(per_node.keys())
-    # Preserve order of check names from the first node that has them.
+    # Preserve order of (section, name) pairs from the first node that has them.
+    # Older remote nodes (pre-section refactor) may emit no section field;
+    # treat missing as "" so they still render in a single ungrouped block.
     seen = []
+    sections = {}  # name -> section
     for rows in per_node.values():
         for r in rows:
-            if r["name"] not in seen:
-                seen.append(r["name"])
+            name = r["name"]
+            if name not in sections:
+                sections[name] = r.get("section", "")
+                seen.append(name)
     cells = {}
     for node, rows in per_node.items():
         for r in rows:
@@ -619,11 +652,19 @@ def print_cluster_table(per_node, use_color):
             for name in seen
         ]
         col_w[n] = max(max(widths, default=0), len(n))
+    total_w = label_w + 2 + sum(col_w[n] + 2 for n in nodes) - 2
     # Header
-    header = " " * label_w + "  " + "  ".join(f"{n:<{col_w[n]}}" for n in nodes)
-    print(header)
-    # Rows
+    print(" " * label_w + "  " + "  ".join(f"{n:<{col_w[n]}}" for n in nodes))
+    # Rows, with section divider lines.
+    last_section = None
     for name in seen:
+        section = sections[name]
+        if section != last_section:
+            if section:
+                bar = f"── {section} "
+                bar += "─" * max(0, total_w - len(bar))
+                print(bar)
+            last_section = section
         cells_text = []
         for n in nodes:
             status, short = cells.get((n, name), ("SKIP", "—"))
