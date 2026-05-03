@@ -1255,6 +1255,40 @@ Verify: `mount | grep /storage` on each node shows
 `redis://tpu0:6379/0` (no password). Non-root `cat /etc/juicefs/redis.env`
 should fail with permission denied.
 
+To change a mount option (e.g. `cache-size`), edit `conf/storage.mount`,
+re-deploy with the same install loop, then `sudo systemctl daemon-reload`
+and `sudo systemctl restart storage.mount` per node in sequence. Verify
+the new option is live with
+`pgrep -af "/usr/bin/juicefs " | grep -oE "<option>=[^,[:space:]]+"`.
+Mount options aren't visible in `mount | grep /storage` (FUSE only shows
+generic flags) or `systemctl show -p ExecMount` (which is also stale on
+already-mounted units) — go via the running juicefs process's argv.
+
+### Trouble: /storage target is busy on remount
+
+`tpups` reports TPU device usage only, not anything about who has files
+open under `/storage`. So even when `tpups` shows everything idle, a
+`systemctl restart storage.mount` can fail with
+`umount: /storage: target is busy` if any user process is holding files
+or has its cwd inside `/storage` (and every user's home is under
+`/storage/home/<u>`, so this includes any forgotten background process,
+any disconnected SSH session that left jobs running under nohup/screen/
+tmux, and any MPI runtime / multiprocessing pool whose launcher died
+without reaping its workers).
+
+Before any planned remount, check who's holding it:
+
+```
+sudo fuser -m /storage    # PIDs holding files / cwd inside /storage
+who                       # active interactive sessions
+```
+
+Inspect any holders that show up (`ps -p <pid> -o user,etime,time,comm`
+— very low cumulative CPU `time` over multi-day `etime` suggests
+orphaned workers). Decide what to do case by case: defer the remount,
+ping the user, or clean up specific stale processes. Don't write a
+catch-all kill script for it.
+
 ### Backups (tpu0 only)
 
 Hourly metadata-only backups: `juicefs dump | gzip` → `gs://mfrs-tpu-cluster/backups/`,

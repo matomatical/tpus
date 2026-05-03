@@ -112,6 +112,7 @@ May 2026, more backend stability improvements
 
 * [x] Cap docker container json log growth (logrotate copytruncate + daemon.json log-opts).
 * [x] Fix ConTeXt MarkIV format build cluster-wide (lua-socket + cpath symlinks under `/usr/local`).
+* [x] Bump JuiceFS cache budget 40 G → 65 G uniformly after non-cache cleanup.
 
 TPU monitoring improvements
 
