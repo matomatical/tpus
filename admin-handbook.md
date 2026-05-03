@@ -1484,6 +1484,51 @@ rsyncs in parallel with progress lines, then flips the passwd entry and
 verifies `sudo -u <user> -i pwd` on each node. The manual checklist below
 documents the same steps in case you ever need to do it by hand.
 
+## Rebooting the cluster
+
+Aim for a maintenance reboot roughly monthly to clear stale processes and
+pick up patched libraries. `tpu-health` flags this with `WARN` once a node's
+uptime crosses 28 days.
+
+The post-`apt upgrade` recipe above reboots tpu1–tpu3 in parallel. For a
+routine reboot **without** a preceding upgrade, prefer doing one node at a
+time and verifying each before moving on, so any regression is caught before
+it propagates. Order: `tpu1` → `tpu2` → `tpu3`, then `tpu0` last (since
+you're sitting on it).
+
+Pre-flight: confirm the cluster is idle.
+
+```
+tpups
+```
+
+Per remote node (replace `N` with `1`, `2`, `3` in turn):
+
+```
+ssh tpuN 'sudo shutdown -r now'  # SSH closes (exit 255) — expected
+# wait for it to come back (~100-130s typical):
+until ssh -o ConnectTimeout=5 tpuN 'uptime' 2>/dev/null; do sleep 5; done
+sleep 20  # let services settle
+tpu-health
+```
+
+`tpu-health` should show, for the rebooted node: uptime 0d, stale libs 0,
+`/storage` mounted, services running, redis PONG.
+
+Finally, tpu0 — use `+1` instead of `now` so the SSH session can exit
+cleanly:
+
+```
+sudo shutdown -r +1
+```
+
+The ~2-minute window during tpu0's reboot takes redis and `tpu-dashboard`
+offline; remote VMs' heartbeat services reconnect once redis is back, and
+JuiceFS on tpu1–tpu3 is independent (each has its own FUSE client to GCS).
+Reconnect after ~3 minutes and run `tpu-health` to confirm. `gc fresh:
+never` post-reboot is expected — the weekly timer will fire on its natural
+cadence.
+
 ## TODO: Job management
 
 See this discussion with gemini for hq configuration:
