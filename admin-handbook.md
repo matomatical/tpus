@@ -793,16 +793,60 @@ LaTeX has various distributions with various sizes
   for notes on different options).
 While we are a bit short on space, that should hopefully clear up soon based on
 the JuiceFS project, and I kept running into missing packages, fonts, and tools
-even with `texlive-latex-extra`. So I'm installing the full `texlive-full`:
+even with `texlive-latex-extra`. So I'm installing the full `texlive-full`.
+
+There's a known trap: `texlive-full` pulls in `context`, whose post-install
+script pregenerates the ConTeXt MarkIV format (`cont-en.fmt`). That step uses
+LuaTeX, which `require()`s the `socket.core` Lua module via
+`util-soc-imp-socket.lua`. Debian's `texlive-context` does not depend on
+`lua-socket`, and even if `lua-socket` is installed, its files land under
+`/usr/lib/x86_64-linux-gnu/lua/5.3/` — outside the `/usr/local/.../5.3/` paths
+that texlua's `package.cpath` searches. When `socket.core` isn't found, TeX
+prints `?` and waits for keyboard input on stdin, which the apt frontend never
+provides. The install hangs, holding the dpkg lock indefinitely. Symptom:
+`apt` stuck at `Pregenerating ConTeXt MarkIV format. This may take some
+time...` for hours, with the deepest `luatex` process showing TIME=0,
+`voluntary_ctxt_switches: 1`, and a kernel stack ending in
+`n_tty_read+...` on `/dev/pts/<N>`.
+
+To install texlive-full cleanly, install `lua-socket` first and symlink it
+into texlua's search paths. The same trick fixes a node where the install has
+already hung (after killing the stuck `luatex` and letting `apt` finish, the
+ConTeXt format will be missing — re-run `mtxrun --script base --make cont-en`
+once the symlinks are in place).
 
 ```
 for t in 0 1 2 3; do
-  ssh tpu$t 'sudo apt install -y texlive-full'
+  ssh tpu$t '
+    set -e
+    # 1. lua-socket provides socket.core for Lua 5.3 (and 5.1/5.2/5.4)
+    sudo apt install -y lua-socket
+    # 2. expose Debian'\''s lua-socket under the /usr/local/.../5.3/ paths
+    #    that texlua searches by default (texlua ignores /usr/lib/x86_64-linux-gnu)
+    sudo mkdir -p /usr/local/lib/lua/5.3 /usr/local/share/lua/5.3
+    sudo ln -snfT /usr/lib/x86_64-linux-gnu/lua/5.3/socket /usr/local/lib/lua/5.3/socket
+    sudo ln -snfT /usr/lib/x86_64-linux-gnu/lua/5.3/mime   /usr/local/lib/lua/5.3/mime
+    sudo ln -snfT /usr/share/lua/5.3/socket /usr/local/share/lua/5.3/socket
+    sudo ln -snfT /usr/share/lua/5.3/mime   /usr/local/share/lua/5.3/mime
+    for f in ltn12.lua mime.lua socket.lua; do
+      sudo ln -sfT /usr/share/lua/5.3/$f /usr/local/share/lua/5.3/$f
+    done
+    # 3. now texlive-full can complete the ConTeXt format pregen unattended
+    sudo DEBIAN_FRONTEND=noninteractive apt install -y texlive-full
+    # 4. (only needed for recovery) explicitly rebuild cont-en if a prior
+    #    install was killed mid-format-gen:
+    # sudo mtxrun --script base --make cont-en
+  '
 done
 ```
 
-TODO: Confirm this comes with `latexmk cm-super dvipng`, previously installed
-manually.
+Verify: `find /var/lib/texmf/luatex-cache -name cont-en.fmt` should show a
+freshly-built ~11 MB file on each node. Compile a one-line test doc with
+`echo "\\starttext hi\\stoptext" > /tmp/t.tex && cd /tmp && context t.tex` to
+confirm end-to-end (produces `t.pdf`).
+
+TODO: Confirm `texlive-full` comes with `latexmk cm-super dvipng`, previously
+installed manually.
 
 Ideally could use tectonic, but students may find that confusing. For space
 reasons, I don't want to install both. Note tectonic is not available via apt,

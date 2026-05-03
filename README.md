@@ -107,7 +107,11 @@ Major feature: Persistent shared storage
 * [x] `tpu-health`: `gc timer` and `gc fresh` rows for the weekly compact job.
 * [x] Migration cleanup: per-node `/home/<u>` backups deleted (~114 GiB freed),
   uv-cache and venv-python symlinks repointed to `/storage` paths.
+
+May 2026, more backend stability improvements
+
 * [x] Cap docker container json log growth (logrotate copytruncate + daemon.json log-opts).
+* [x] Fix ConTeXt MarkIV format build cluster-wide (lua-socket + cpath symlinks under `/usr/local`).
 
 TPU monitoring improvements
 
