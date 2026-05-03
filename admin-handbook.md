@@ -498,12 +498,98 @@ for t in 0 1 2 3; do
 done
 ```
 
+### Configuring docker container log rotation
+
+Docker's `json-file` log driver writes one JSON object per stdout/stderr line
+to `/var/lib/docker/containers/<id>/<id>-json.log`. With no size limits set,
+these files grow unbounded for the life of the container. The TPU image's
+monitoring containers — particularly `instance_agent` (Docker API v1.41/1.43
+mismatch noise) and `google-runtime-monitor` (TF-assumption errors when
+running JAX) — write at ~50–70 MB/day combined per VM, accumulating gigabytes
+over a typical multi-month uptime. See `issues/docker-api-version/` for the
+underlying noise source.
+
+Two complementary controls:
+
+- A logrotate rule that caps existing containers' logs via `copytruncate`
+  (docker keeps writing to the same fd; the file is just emptied in place).
+  Active immediately on next daily logrotate run, no daemon reload required.
+- `daemon.json` log driver defaults (`max-size`, `max-file`). Applied at
+  container creation time, by the docker daemon's in-memory config. Two
+  things are needed for this to take effect on a given container:
+  1. The docker daemon must be **restarted** (`systemctl restart docker`)
+     so it re-reads `daemon.json`. SIGHUP / `systemctl reload docker`
+     does **not** cover `log-driver` / `log-opts`.
+  2. The container must be **recreated** against the new daemon (not
+     just started against an existing image). All six monitoring
+     services (`healthagent`, `monitoringagent`, `cloud-ssa-agents`,
+     `tpu-runtime`, `google-collectd`, `google-runtime-monitor`)
+     `docker rm` + `docker run` in their systemd units, so a
+     `systemctl restart <unit>` is enough — but it has to happen
+     after the daemon restart.
+
+Step 1 — drop in the config files. Logrotate is now active for existing
+containers; `daemon.json` is staged but inert until the daemon restarts:
+
+```
+for t in 0 1 2 3; do
+  scp conf/logrotate-docker.conf conf/docker-daemon.json tpu$t:
+  ssh tpu$t 'sudo install -m 644 -o root -g root ~/logrotate-docker.conf /etc/logrotate.d/docker \
+    && sudo install -m 644 -o root -g root ~/docker-daemon.json /etc/docker/daemon.json \
+    && rm ~/logrotate-docker.conf ~/docker-daemon.json'
+done
+```
+
+Step 2 — apply `daemon.json` to existing containers. Disruptive: stops
+the monitoring containers (incl. tpu-runtime) for a few seconds while the
+docker daemon and units cycle. Run `tpups` first; only proceed if no users
+have TPU jobs in flight:
+
+```
+for t in 0 1 2 3; do
+  ssh tpu$t '
+    sudo systemctl stop tpu-runtime.service healthagent.service monitoringagent.service \
+                        cloud-ssa-agents.service google-runtime-monitor.service google-collectd.service \
+      && sudo systemctl restart docker.service \
+      && sleep 2 \
+      && sudo systemctl start google-collectd.service google-runtime-monitor.service cloud-ssa-agents.service \
+                              monitoringagent.service healthagent.service tpu-runtime.service
+  '
+done
+```
+
+Verify: `cat /etc/docker/daemon.json` shows `bip` preserved at
+`169.254.123.1/24` plus the new `log-driver` / `log-opts` keys.
+`sudo logrotate -d /etc/logrotate.d/docker` parses cleanly and reports
+`Handling 1 logs`. Per-container check that the new opts are active:
+
+```
+for c in healthagent monitoringagent instance_agent tpu-runtime google-collectd google-runtime-monitor; do
+  sudo docker inspect $c --format "{{.Name}} {{.HostConfig.LogConfig}}"
+done
+# expect: {json-file map[max-file:3 max-size:100m]} on every line
+```
+
+For a fresh provision: deploy both files in step 1 as part of cluster setup,
+then run step 2. Step 2 has to come after step 1 and the daemon restart
+must happen *between* stopping the units and starting them — that ordering
+is what makes the new container creations pick up the new log-opts.
+
 ### Trouble: Truncating bloated logs
 
 If the logs have already grown too large, truncate them:
 
 ```
 for t in 0 1 2 3; do ssh tpu$t 'sudo truncate -s 0 /var/log/kern.log /var/log/syslog'; done
+```
+
+For oversized docker container json logs (truncating in place is safe — docker
+keeps writing to the same inode):
+
+```
+for t in 0 1 2 3; do
+  ssh tpu$t "sudo find /var/lib/docker/containers -name '*-json.log' -size +100M -exec truncate -s 0 {} +"
+done
 ```
 
 ### Trouble: healthAgent OOM

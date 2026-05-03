@@ -1,0 +1,8 @@
+{
+  "bip": "169.254.123.1/24",
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m",
+    "max-file": "3"
+  }
+}
