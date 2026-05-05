@@ -24,15 +24,6 @@ alias gs="git status"
 # path stuff
 export PATH="$HOME/.local/bin:$PATH"
 
-# default TPU environment variables (zsh doesn't source /etc/profile.d/)
-export TPU_CHIPS_PER_PROCESS_BOUNDS=1,1,1
-export TPU_PROCESS_BOUNDS=1,1,1
-export TPU_VISIBLE_DEVICES=0
-export PJRT_DEVICE=TPU
-if [[ "$LIBTPU_INIT_ARGS" != *runtime_metric_service_port* ]]; then
-    export LIBTPU_INIT_ARGS="${LIBTPU_INIT_ARGS:+$LIBTPU_INIT_ARGS }--runtime_metric_service_port=8431"
-fi
-
 # shortcut for managing virtual environments
 function auto_activate() {
     # only run in interactive shells
