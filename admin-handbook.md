@@ -775,10 +775,6 @@ for t in 0 1 2 3; do
 done
 ```
 
-Note: `/etc/profile.d/` is only sourced by bash (and sh) login shells. Zsh does
-not source it, so zsh users (i.e. me) need the same exports in their `.zshrc`.
-These are already included in `home-stuff/zshrc.zshrc`.
-
 Users can still use `tpu-device` to override these defaults and target specific
 devices or multiple devices.
 
@@ -787,6 +783,58 @@ sources neither `/etc/profile.d/` nor `~/.zshrc`. So `ssh tpuN 'env | grep TPU_'
 will show nothing — on *all* VMs, not just one. To pick up the defaults across
 SSH, force a login/interactive shell, e.g. `ssh tpuN 'bash -lc "cmd"'` or
 `ssh tpuN 'zsh -ic "cmd"'`.
+
+## Sourcing /etc/profile.d/ in zsh
+
+Bash login shells auto-source `/etc/profile.d/*.sh` via `/etc/profile`. Zsh
+does not — by default, zsh users would miss `tpu-defaults.sh`, the
+`prefer-uv-pip.sh` warning, and any future entries we drop in there. The
+fragment in `conf/zshrc-profile-d.sh` adds a loop to `/etc/zsh/zshrc` that
+sources every `*.sh` under `/etc/profile.d/` in `sh`-emulation mode, so zsh
+interactive shells get parity with bash login shells.
+
+Append the fragment idempotently on each VM (the marker check skips re-runs):
+
+```
+for t in 0 1 2 3; do
+  scp conf/zshrc-profile-d.sh tpu$t:
+  ssh tpu$t '
+    if sudo grep -q "TPUS-ADMIN: source /etc/profile.d" /etc/zsh/zshrc; then
+      echo "tpu$t: already patched"
+    else
+      sudo tee -a /etc/zsh/zshrc < ~/zshrc-profile-d.sh > /dev/null
+      echo "tpu$t: appended"
+    fi
+    rm ~/zshrc-profile-d.sh
+  '
+done
+```
+
+After this, `home-stuff/zshrc.zshrc`'s manual TPU exports are redundant but
+harmless — they get re-set after `/etc/profile.d/tpu-defaults.sh` runs. The
+ssh-non-interactive-non-login caveat above still applies.
+
+## Discouraging plain `pip`
+
+Students sometimes type `pip install <pkg>` instead of `uv pip install <pkg>`,
+which either misses uv's resolver or installs into the wrong environment.
+`conf/prefer-uv-pip.sh` defines shell functions for `pip` and `pip3` that
+warn and exit non-zero — unless `pip` resolves into the active `$VIRTUAL_ENV`,
+in which case it passes through to the venv's pip. Escape hatches are
+`raw-pip` and `raw-pip3`.
+
+Because it lives in `/etc/profile.d/`, it reaches bash login shells
+automatically and zsh interactive shells via the zshrc fragment above.
+
+```
+for t in 0 1 2 3; do
+  scp conf/prefer-uv-pip.sh tpu$t:
+  ssh tpu$t 'sudo install -m 644 ~/prefer-uv-pip.sh /etc/profile.d/prefer-uv-pip.sh && rm ~/prefer-uv-pip.sh'
+done
+```
+
+Existing shells won't pick up changes until users open a new shell. No need
+to nudge anyone — students will see the warning the next time they SSH in.
 
 ## Other packages
 

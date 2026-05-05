@@ -352,6 +352,13 @@ a venv created once in your home is usable from all 4 VMs.
 Remember to activate your venv (`source venv/bin/activate`) each time
 you log in before running your code.
 
+Use `uv pip install <pkg>` rather than plain `pip install <pkg>`, so packages
+land in the active venv via uv's resolver. The cluster intercepts interactive
+`pip` and `pip3` typed at the shell prompt and prints a reminder instead of
+running them. (Inside an activated venv whose own `pip` is on `PATH`, that
+pip runs normally — only the system pip is intercepted.) If you really need
+plain pip, run `raw-pip` or `raw-pip3`.
+
 ### JAX
 
 Working with JAX on the cluster is just like working with JAX on a GPU or CPU.

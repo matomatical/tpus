@@ -121,6 +121,8 @@ May 2026, more backend stability improvements
 * [x] `tpu-handbook` command for paging the user handbook from the shell.
 * [x] Diagnose the "first-byte ignored" SSH config bug as OpenSSH strict-modes
   on group-writable user config; `adduser.sh` pre-seeds `~/.ssh/config` 0600.
+* [x] Patch `/etc/zsh/zshrc` to source `/etc/profile.d/`, giving zsh parity with bash login shells.
+* [x] Discourage plain `pip`: `/etc/profile.d/` shell function warns unless pip lives in the active venv (`raw-pip` escape hatch).
 
 TPU monitoring improvements
 
