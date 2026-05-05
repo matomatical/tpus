@@ -714,22 +714,33 @@ done
 
 Per-user cluster keys are set up automatically by `adduser.sh`.
 
-### Trouble: Bad configuration option
+### Trouble: Bad configuration option (the "first byte" bug)
 
-For some very weird reason, the ssh tool on the TPUs doesn't see the first byte
-of the config file. This often led me to a parse error. Config files should
-start with a leading blank line as a workaround (both `cluster-ssh.conf` and
-any `~/.ssh/config` files).
+Symptom: `ssh` reports a bogus parse error on line 1 of `~/.ssh/config`,
+e.g. `Bad configuration option: ost` — `Host` with the leading byte missing.
 
-I confirmed there were no weird bytes with `od -c ~/.ssh/config`.
+Cause: **overly-permissive modes on the user config file.** OpenSSH's
+strict-modes check on `~/.ssh/config` does not abort cleanly on
+group/other-writable mode (which is what the docs imply); instead it
+silently drops the first byte before parsing, producing this confusing
+off-by-one. Repro is one line:
 
-Gemini guesses this is a bug in the SSH version bundled with the image. I guess
-I think that's unlikely because I think the SSH version is up to date?
+```
+chmod 0664 ~/.ssh/config && ssh -G github.com   # parse error: "ost"
+chmod 0600 ~/.ssh/config && ssh -G github.com   # works
+```
 
-Anyway it doesn't seem to be a wider problem so I'll just leave it...
+Fix: `chmod 0600 ~/.ssh/config`. New users trip this easily because the
+Debian/Ubuntu user-private-group default umask `0002` yields `0664` on
+files created by an editor. `adduser.sh` now pre-seeds `~/.ssh/config`
+at `0600` so the user inherits the mode when they edit-and-save.
 
-Update: Later, I can't seem to reproduce this. So just use blank line or double
-comment for now.
+Note: the leading blank line currently in the deployed `/etc/ssh/ssh_config`
+is a vestigial workaround from when this was misdiagnosed as a system-wide
+"first byte ignored" bug. It's harmless — system configs don't go through
+the strict-modes path — but no longer load-bearing.
+
+Full investigation: `issues/ssh-config-strict-modes.md`.
 
 ## Miscelaneous issues
 

@@ -174,6 +174,10 @@ Host tpu3
     ProxyJump tpu0
 ```
 
+Make sure the file's mode is `0600` (`chmod 600 ~/.ssh/config`) — SSH
+silently misparses the first line when the file is group- or
+world-writable, producing a confusing parse error on line 1.
+
 After this, you can SSH into `tpuX` using the simple command `ssh tpuX`
 where `X` is 0, 1, 2, or 3.
 

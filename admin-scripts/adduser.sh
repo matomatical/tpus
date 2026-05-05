@@ -100,6 +100,18 @@ sudo chown -R "$USERNAME:$USERNAME" "$HOME_NEW/.ssh"
 sudo chmod 0600 "$HOME_NEW/.ssh/authorized_keys" "$HOME_NEW/.ssh/cluster"
 sudo chmod 0644 "$HOME_NEW/.ssh/cluster.pub"
 
+# --- 6. Pre-seed ~/.ssh/config at 0600 -----------------------------------
+#
+# The default umask under user-private-groups is 0002, so an editor-created
+# ~/.ssh/config lands at 0664. OpenSSH's strict-modes path on user config
+# does not abort cleanly on group-writable; it silently drops the first
+# byte before parsing, producing a confusing "Bad configuration option"
+# error on line 1. Pre-seeding with mode 0600 means edits inherit the mode
+# and the user never trips this. See issues/ssh-config-strict-modes.md.
+
+sudo install -m 0600 -o "$USERNAME" -g "$USERNAME" /dev/null \
+    "$HOME_NEW/.ssh/config"
+
 echo
 echo "=== Done! ==="
 echo "  User '$USERNAME' created with shared home at $HOME_NEW."

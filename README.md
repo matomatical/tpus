@@ -115,9 +115,12 @@ May 2026, more backend stability improvements
 * [x] Fix ConTeXt MarkIV format build cluster-wide (lua-socket + cpath symlinks under `/usr/local`).
 * [x] Bump JuiceFS cache budget 40 G → 65 G uniformly after non-cache cleanup.
 * [x] tpu-health: split disk into non-cache + cache rows, group checks by section.
-* [x] Document monthly cluster reboot procedure (sequential, `tpu-health` verification).
+* [x] Document monthly cluster reboot procedure (sequential, `tpu-health`
+  verification).
 * [x] Install pandoc-katex 0.1.11 cluster-wide (pandoc filter for KaTeX math).
 * [x] `tpu-handbook` command for paging the user handbook from the shell.
+* [x] Diagnose the "first-byte ignored" SSH config bug as OpenSSH strict-modes
+  on group-writable user config; `adduser.sh` pre-seeds `~/.ssh/config` 0600.
 
 TPU monitoring improvements
 
