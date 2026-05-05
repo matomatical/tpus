@@ -115,6 +115,7 @@ May 2026, more backend stability improvements
 * [x] Bump JuiceFS cache budget 40 G → 65 G uniformly after non-cache cleanup.
 * [x] tpu-health: split disk into non-cache + cache rows, group checks by section.
 * [x] Document monthly cluster reboot procedure (sequential, `tpu-health` verification).
+* [x] Install pandoc-katex 0.1.11 cluster-wide (pandoc filter for KaTeX math).
 
 TPU monitoring improvements
 

@@ -52,6 +52,7 @@ software installed already:
 * latexmk
 * ffmpeg
 * pandoc
+* pandoc-katex (pandoc filter that pre-renders `$math$` to KaTeX HTML)
 * entr
 * uv
 

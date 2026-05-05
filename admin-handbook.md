@@ -786,6 +786,48 @@ for t in 0 1 2 3; do
 done
 ```
 
+## Installing pandoc-katex
+
+[`pandoc-katex`](https://github.com/xu-cheng/pandoc-katex) is a pandoc filter
+that pre-renders `$math$` to KaTeX HTML — useful for users converting markdown
+notes or papers to web-friendly HTML without a JS runtime in the browser.
+
+Upstream ships standalone binaries with no checksum file alongside, so we pin
+our own sha256 of the release tarball we vetted. Re-runs of the install
+procedure verify against this digest, so all four nodes end up with
+bit-identical binaries and any future tampering with the release asset is
+caught.
+
+```
+SHA256=eddde83efe69656511e512f511221491d5b5c1bf6291c45e5c06a86744f9502f
+URL=https://github.com/xu-cheng/pandoc-katex/releases/download/0.1.11/pandoc-katex-0.1.11-x86_64-unknown-linux-gnu.tar.gz
+TARBALL=pandoc-katex-0.1.11-x86_64-unknown-linux-gnu.tar.gz
+for t in 0 1 2 3; do
+  ssh tpu$t "
+    set -e
+    cd ~
+    curl -fsSL -O '$URL'
+    echo '$SHA256  $TARBALL' | sha256sum -c -
+    tar xzf '$TARBALL' ./bin/pandoc-katex
+    sudo install -m 755 -o root -g root ./bin/pandoc-katex /usr/local/bin/pandoc-katex
+    rm '$TARBALL' ./bin/pandoc-katex
+    rmdir ./bin
+  "
+done
+```
+
+Verify: `pandoc-katex --version` prints `pandoc-katex 0.1.11` on each node.
+End-to-end smoke test:
+
+```
+echo '$E=mc^2$' | pandoc -f markdown -t html --filter pandoc-katex
+```
+
+should emit a `<span class="katex">…` block.
+
+To upgrade: fetch the new release URL, compute its sha256, update the three
+constants, and re-run the loop.
+
 ## Installing LaTeX
 
 LaTeX has various distributions with various sizes
