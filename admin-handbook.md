@@ -228,7 +228,7 @@ for t in 0 1 2 3; do
     sudo install -m 755 \
       ~/tpu-device.sh ~/tpu-warmup.sh ~/tpu-heartbeat.py \
       ~/tpu-heatmap.py ~/tpu-usage.py ~/tpups.py \
-      ~/tpu-metrics.py \
+      ~/tpu-metrics.py ~/tpu-handbook.sh \
       /home/shared/
     sudo install -m 750 -o root -g matt ~/tpu-health.py /home/shared/tpu-health.py
     rm ~/tpu-*.sh ~/tpu-*.py ~/tpups.py
@@ -248,6 +248,7 @@ for t in 0 1 2 3; do
   ssh tpu$t 'sudo ln -sf /home/shared/tpu-heatmap.py /usr/local/bin/tpu-heatmap'
   ssh tpu$t 'sudo ln -sf /home/shared/tpu-health.py /usr/local/bin/tpu-health'
   ssh tpu$t 'sudo ln -sf /home/shared/tpu-warmup.sh /usr/local/bin/tpu-warmup'
+  ssh tpu$t 'sudo ln -sf /home/shared/tpu-handbook.sh /usr/local/bin/tpu-handbook'
 done
 ```
 

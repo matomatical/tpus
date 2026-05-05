@@ -20,7 +20,8 @@ Repo contents
 
 * `admin-scripts/` — scripts for admin use (adduser, etc.)
 * `shared-scripts/` — scripts deployed to `/home/shared/` on each VM
-  (`tpu-device`, `tpups`, `tpu-usage`, `tpu-heatmap`, `tpu-heartbeat`)
+  (`tpu-device`, `tpups`, `tpu-usage`, `tpu-heatmap`, `tpu-heartbeat`,
+  `tpu-handbook`)
 * `conf/` — config files to deploy to VMs (logrotate, etc.)
 * `home-stuff/` — dotfiles to deploy to VMs
 * `issues/` — bug reports for TPU VM image issues
@@ -116,6 +117,7 @@ May 2026, more backend stability improvements
 * [x] tpu-health: split disk into non-cache + cache rows, group checks by section.
 * [x] Document monthly cluster reboot procedure (sequential, `tpu-health` verification).
 * [x] Install pandoc-katex 0.1.11 cluster-wide (pandoc filter for KaTeX math).
+* [x] `tpu-handbook` command for paging the user handbook from the shell.
 
 TPU monitoring improvements
 

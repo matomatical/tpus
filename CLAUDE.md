@@ -18,8 +18,9 @@ Canonical references:
   `adduser.sh`, `fetch-logs.sh`, `bench-*.py`.
 - `shared-scripts/` — deployed to `/home/shared/` on each VM and symlinked
   into `/usr/local/bin/`: `tpu-device.sh`, `tpups.py`, `tpu-usage.py`,
-  `tpu-heatmap.py`, `tpu-health.py`, `tpu-heartbeat.py`. The
-  `dashboard/` subdir is deployed to tpu0 only (web UI on `:8082`).
+  `tpu-heatmap.py`, `tpu-health.py`, `tpu-heartbeat.py`,
+  `tpu-handbook.sh`. The `dashboard/` subdir is deployed to tpu0 only (web
+  UI on `:8082`).
 - `conf/` — deployed under `/etc/` on each VM: systemd units (heartbeat,
   heartbeat-web, healthagent-restart), logrotate configs, `tpu-defaults.sh`,
   `tpu-logs.conf`, `cluster-hosts`, `cluster-ssh.conf`.

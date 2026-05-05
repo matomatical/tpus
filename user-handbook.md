@@ -2,6 +2,12 @@
 
 Welcome to my tiny little cluster! Let's do some cool research together!
 
+Once you have access (see [Accessing the VMs via SSH](#accessing-the-vms-via-ssh)),
+you can re-read this handbook anytime from any node with the `tpu-handbook`
+command. It pages through `less` on a terminal and writes raw markdown when
+piped, so e.g. `tpu-handbook | grep -i juicefs -A 5` works for quick
+lookups (and for AI agents on the cluster that capture command output).
+
 
 # About the cluster
 
