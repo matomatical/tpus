@@ -123,6 +123,7 @@ May 2026, more backend stability improvements
   on group-writable user config; `adduser.sh` pre-seeds `~/.ssh/config` 0600.
 * [x] Patch `/etc/zsh/zshrc` to source `/etc/profile.d/`, giving zsh parity with bash login shells.
 * [x] Discourage plain `pip`: `/etc/profile.d/` shell function warns unless pip lives in the active venv (`raw-pip` escape hatch).
+* [x] `/storage/shared/` sticky-bit drop directory for inter-user file sharing, documented in the user handbook.
 
 TPU monitoring improvements
 

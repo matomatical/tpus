@@ -753,6 +753,39 @@ Most other changes are easier, make yourself at home via dotfiles like you
 normally would. You can set up your path, default editor, etc., in your
 profile. If you want me to install some missing standard software, just ask.
 
+## Sharing files with other users
+
+Home directories are `drwxr-x---` (owner-only), so other users can't read
+files directly out of your home. To share a file with another user, drop a
+copy in `/storage/shared/`. It's a world-writable directory on the shared
+filesystem, so the file is immediately visible from every VM.
+
+For example, suppose `mfr` wants to share a checkpoint with `student`:
+
+```
+# mfr publishes the file
+mfr$ cp /storage/home/mfr/checkpoints/diffusion/v3/final.pkl \
+       /storage/shared/diffusion-v3.pkl
+
+# student copies it into their own home from any VM
+student$ cp /storage/shared/diffusion-v3.pkl ~/
+```
+
+A few notes:
+
+* The default `umask` (`002`) gives new files mode `664` (world-readable),
+  so a plain `cp` is normally enough. If the copied file ends up
+  unreadable to others (e.g. you used `cp -p`, or the source was `600`),
+  run `chmod a+r /storage/shared/yourfile` so the recipient can read it.
+  For a directory tree, use `chmod -R a+rX` — the capital `X` adds
+  execute only on entries that are already executable, so plain files
+  don't become runnable.
+* The directory has the sticky bit (`drwxrwxrwt`, like `/tmp`): anyone
+  can write into it, but only a file's owner (or root) can delete or
+  rename it. Clean up your own shared files with `rm` once the
+  recipient has copied them---please don't use `/storage/shared/` as
+  long-term storage.
+
 ## Graduating to your own cluster
 
 If you need more compute, or want more space to run your own experiments
