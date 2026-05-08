@@ -137,6 +137,7 @@ TPU monitoring improvements
 
 Major feature: TPU queueing system (prerequisite, persistent shared storage)
 
+* [x] Design-input note on cross-node logging race (`issues/queueing/cross-node-logging.md`).
 * [ ] install or develop some simple system that makes it easier to launch
   large numbers of TPU job scripts for each user, and then they will
   automatically be launched when TPUs are free; users only have to interact
