@@ -30,9 +30,9 @@ Repo contents
 Roadmap
 -------
 
-Most features built with help from Gemini and/or Claude.
+### Late 2025 / early 2026: first provisioning, basic tools
 
-Late 2025:
+Most features built with help from Gemini
 
 * [x] Basic setup of important software.
 * [x] Automate user creation given a public key.
@@ -42,7 +42,17 @@ Late 2025:
 * [x] tpu-device wrapper for managing environment variables.
 * [x] Original NFS based system (disk filled up, cluster died, RIP).
 
-March 2026, feature upgrades:
+### March 2026: reprovision, refresh and expand tools
+
+Most features built with help from Claude Code
+
+Critical storage issue fixes:
+
+* [x] Configured logrotate and journald to cap log file size
+* [x] Investigated and reported a healthAgent OOM bug to Google (see
+  `issues/healthagent-oom/`).
+
+Feature upgrades:
 
 * [x] tpu-device: support for multi-tpu job launching.
 * [x] tpu-heatmap utility visualising usage calendar. Let's keep the TPUs warm!
@@ -50,13 +60,29 @@ March 2026, feature upgrades:
   cluster.
 * [x] PyTorch/XLA support (instructions in handbook).
 
-March 2026, critical storage issue fixes:
+### April 2026: shared storage and stability upgrades
 
-* [x] Configured logrotate and journald to cap log file size
-* [x] Investigated and reported a healthAgent OOM bug to Google (see
-  `issues/healthagent-oom/`).
+Major feature: Persistent shared storage
 
-April 2026, feature upgrades:
+* [x] Consider various options (see issues/storage/storage-options.md)
+  -> try JuiceFS + GCS
+* [x] Research deployment rollout plan, cost estimates etc.
+* [x] Create bucket, install and configure JuiceFS
+* [x] Run benchmarks and validate acceptable performance
+  (see issues/storage/juicefs-benchmark-results.md)
+* [x] Mount `/storage` via systemd on all 4 nodes.
+* [x] Port user home directories to `/storage/home/`.
+* [x] `tpu-warmup` utility for on-demand cache warming on a chosen node.
+* [x] Rewrite `tpu-health` as admin-only cluster-wide tool with /storage
+  signals (mount, capacity, cache, rawstaging, GCS errors) and Redis ping.
+* [x] Validate and automate juicefs redis database backups.
+* [x] Weekly `juicefs gc --compact`; manual `gc` and `fsck` baseline clean.
+* [x] `tpu-health`: `gc timer` and `gc fresh` rows for the weekly compact job.
+* [x] Migration cleanup: per-node `/home/<u>` backups deleted (~114 GiB freed),
+  uv-cache and venv-python symlinks repointed to `/storage` paths.
+* [x] Bump JuiceFS cache budget 40 G → 65 G uniformly after non-cache cleanup.
+
+User-facing feature upgrades
 
 * [x] tpu-device: optional, default env vars equivalent to `tpu-device 0`.
 * [x] Inter-VM SSH configured by default for all users.
@@ -66,7 +92,7 @@ April 2026, feature upgrades:
 * [x] tpups: --watch variant for live reloading, dynamic table width, dynamic
   column widths, ANSI colours and unicode rules.
 
-April 2026, backend stability improvements:
+Backend stability improvements:
 
 * [x] Reverted system Python from 3.14 back to 3.10.
 * [x] Persistent fix for TPU log directory permission issue.
@@ -90,50 +116,40 @@ April 2026, backend stability improvements:
 * [x] Service configuration stability improvements.
 * [x] tpu-device: pin libtpu metrics service to a per-chip port.
 
-Major feature: Persistent shared storage
+### May 2026: TPU monitoring and other upgrades
 
-* [x] Consider various options (see issues/storage/storage-options.md)
-  -> try JuiceFS + GCS
-* [x] Research deployment rollout plan, cost estimates etc.
-* [x] Create bucket, install and configure JuiceFS
-* [x] Run benchmarks and validate acceptable performance
-  (see issues/storage/juicefs-benchmark-results.md)
-* [x] Mount `/storage` via systemd on all 4 nodes.
-* [x] Port user home directories to `/storage/home/`.
-* [x] `tpu-warmup` utility for on-demand cache warming on a chosen node.
-* [x] Rewrite `tpu-health` as admin-only cluster-wide tool with /storage
-  signals (mount, capacity, cache, rawstaging, GCS errors) and Redis ping.
-* [x] Validate and automate juicefs redis database backups.
-* [x] Weekly `juicefs gc --compact`; manual `gc` and `fsck` baseline clean.
-* [x] `tpu-health`: `gc timer` and `gc fresh` rows for the weekly compact job.
-* [x] Migration cleanup: per-node `/home/<u>` backups deleted (~114 GiB freed),
-  uv-cache and venv-python symlinks repointed to `/storage` paths.
+Major feature: Real-time dashboard
 
-May 2026, more backend stability improvements
-
-* [x] Cap docker container json log growth (logrotate copytruncate + daemon.json log-opts).
-* [x] Fix ConTeXt MarkIV format build cluster-wide (lua-socket + cpath symlinks under `/usr/local`).
-* [x] Bump JuiceFS cache budget 40 G → 65 G uniformly after non-cache cleanup.
-* [x] tpu-health: split disk into non-cache + cache rows, group checks by section.
-* [x] Document monthly cluster reboot procedure (sequential, `tpu-health`
-  verification).
-* [x] Install pandoc-katex 0.1.11 cluster-wide (pandoc filter for KaTeX math).
-* [x] `tpu-handbook` command for paging the user handbook from the shell.
-* [x] Diagnose the "first-byte ignored" SSH config bug as OpenSSH strict-modes
-  on group-writable user config; `adduser.sh` pre-seeds `~/.ssh/config` 0600.
-* [x] Patch `/etc/zsh/zshrc` to source `/etc/profile.d/`, giving zsh parity with bash login shells.
-* [x] Discourage plain `pip`: `/etc/profile.d/` shell function warns unless pip lives in the active venv (`raw-pip` escape hatch).
-* [x] `/storage/shared/` sticky-bit drop directory for inter-user file sharing, documented in the user handbook.
-
-TPU monitoring improvements
-
-* [x] upgrade tpups with memory/processor utilisation
-* [x] tpu-device: always pin per-chip metrics port (was tripping on
-  tpu-defaults' default flag, leaving multi-launches collided on 8431).
+* [x] Upgrade tpups with memory/processor utilisation
 * [x] tpu-dashboard: live tpups + HBM/duty time-series web UI on tpu0:8082.
 * [ ] also tensorcore utilization?
 * [ ] add tpups / usage / heatmap views into tpu-dashboard
 * [ ] public web dashboard (rather than ssh port forward)
+
+New user-facing features
+
+* [x] Install pandoc-katex 0.1.11 cluster-wide (pandoc filter for KaTeX math).
+* [x] `tpu-handbook` command for paging the user handbook from the shell.
+* [x] Plain `pip` outside venv gives a warning.
+* [x] `/storage/shared/` sticky-bit drop directory for inter-user file sharing.
+
+More backend stability improvements
+
+* [x] Cap docker container json log growth (logrotate copytruncate +
+  daemon.json log-opts).
+* [x] Fix ConTeXt MarkIV format build cluster-wide (lua-socket + cpath symlinks
+  under `/usr/local`).
+* [x] tpu-health: split disk into non-cache + cache rows, group checks by section.
+* [x] Document monthly cluster reboot procedure (sequential, `tpu-health`
+  verification).
+* [x] Diagnose the "first-byte ignored" SSH config bug as OpenSSH strict-modes
+  on group-writable user config; `adduser.sh` pre-seeds `~/.ssh/config` 0600.
+* [x] Patch `/etc/zsh/zshrc` to source `/etc/profile.d/`, giving zsh parity
+  with bash login shells.
+* [x] tpu-device: always pin per-chip metrics port (was tripping on
+  tpu-defaults' default flag, leaving multi-launches collided on 8431).
+
+### Future:
 
 Major feature: TPU queueing system (prerequisite, persistent shared storage)
 
