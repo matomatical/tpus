@@ -764,8 +764,7 @@ For example, suppose `mfr` wants to share a checkpoint with `student`:
 
 ```
 # mfr publishes the file
-mfr$ cp /storage/home/mfr/checkpoints/diffusion/v3/final.pkl \
-       /storage/shared/diffusion-v3.pkl
+mfr$ cp /storage/home/mfr/checkpoints/diffusion/v3/final.pkl /storage/shared/diffusion-v3.pkl
 
 # student copies it into their own home from any VM
 student$ cp /storage/shared/diffusion-v3.pkl ~/
