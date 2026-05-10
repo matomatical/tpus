@@ -2,7 +2,7 @@
 # tpu-warmup — pre-fetch /storage paths into the local JuiceFS cache.
 #
 # Usage:
-#   tpu-warmup [PATH ...]              # warm PATH(s) on this node (default: $PWD)
+#   tpu-warmup PATH [PATH ...]          # warm PATH(s) on this node
 #   tpu-warmup -n tpuN PATH [PATH ...]  # warm PATH(s) on a different node via SSH
 #   tpu-warmup --check PATH [...]       # report cached status, don't warm
 #   tpu-warmup --evict PATH [...]       # drop PATH(s) from local cache
@@ -20,7 +20,7 @@ Usage: tpu-warmup [PATH ...]
        tpu-warmup --evict PATH [...]
 
 Pre-fetch /storage paths into the local JuiceFS cache so subsequent reads
-hit local disk instead of GCS. Defaults to current directory if no PATH given.
+hit local disk instead of GCS.
 
 Options:
   -n NODE        Run on NODE (e.g. tpu1) via SSH instead of locally.
@@ -32,6 +32,11 @@ Paths must resolve to somewhere under /storage. Local paths (e.g. /home,
 /tmp) are rejected — they aren't on JuiceFS.
 EOF
 }
+
+if [[ $# -eq 0 ]]; then
+    usage >&2
+    exit 2
+fi
 
 NODE=""
 MODE=""  # "" (warm) | "--check" | "--evict"
