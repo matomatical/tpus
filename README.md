@@ -148,6 +148,8 @@ More backend stability improvements
   with bash login shells.
 * [x] tpu-device: always pin per-chip metrics port (was tripping on
   tpu-defaults' default flag, leaving multi-launches collided on 8431).
+* [x] tpu-health: storage rows show absolute GiB with capacity in the label
+  (`system/32G`, `cache/65G`, `jfs/1000G`) instead of percentages.
 
 ### Future:
 

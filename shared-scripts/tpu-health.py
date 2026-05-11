@@ -45,6 +45,9 @@ def check_boot_disk_noncache(metrics, cache_cap):
     and the live `juicefs_blockcache_bytes` as cache-occupied (subtracted from
     used). Answers "if the cache grows to its cap, how much room is left for
     everything else?". Falls back to overall disk if cache geometry is unknown.
+
+    Returns a 4-tuple; the 4th element is a dynamic name (`system/{cap}G`)
+    that encodes the non-cache capacity in the row label.
     """
     st = os.statvfs("/")
     total = st.f_blocks * st.f_frsize
@@ -53,25 +56,26 @@ def check_boot_disk_noncache(metrics, cache_cap):
     cache_now = metrics.get("juicefs_blockcache_bytes") if metrics else None
     if cache_cap is None or cache_now is None:
         pct = used / total * 100 if total else 0.0
-        free_gib = free / (1024 ** 3)
+        used_gib = used / (1024 ** 3)
         total_gib = total / (1024 ** 3)
         status = "CRIT" if pct >= 90 else "WARN" if pct >= 75 else "OK"
-        return status, f"{pct:.0f}%", \
-            f"non-cache disk: cache geometry unknown, " \
-            f"total disk {pct:.0f}% used ({free_gib:.0f} GiB free of {total_gib:.0f} GiB)"
+        return status, f"{used_gib:.1f} GiB", \
+            f"boot disk (cache geometry unknown): " \
+            f"{used_gib:.1f}/{total_gib:.0f} GiB used ({pct:.0f}%)", \
+            f"boot/{total_gib:.0f}G"
     nc_total = total - int(cache_cap)
-    nc_used = used - int(cache_now)
+    nc_used = max(0, used - int(cache_now))
     if nc_total <= 0:
-        return "WARN", "n/a", "non-cache disk: cache cap >= total disk?"
-    pct = max(0.0, nc_used / nc_total * 100)
+        return "WARN", "n/a", "non-cache disk: cache cap >= total disk?", None
+    pct = nc_used / nc_total * 100
     nc_used_gib = nc_used / (1024 ** 3)
     nc_total_gib = nc_total / (1024 ** 3)
     cache_cap_gib = cache_cap / (1024 ** 3)
     status = "CRIT" if pct >= 90 else "WARN" if pct >= 75 else "OK"
-    return status, f"{pct:.0f}%", \
-        f"non-cache disk {pct:.0f}% used " \
-        f"({nc_used_gib:.0f} of {nc_total_gib:.0f} GiB; " \
-        f"cache cap {cache_cap_gib:.0f} GiB reserved)"
+    return status, f"{nc_used_gib:.1f} GiB", \
+        f"system disk {nc_used_gib:.1f}/{nc_total_gib:.0f} GiB ({pct:.0f}%); " \
+        f"cache cap {cache_cap_gib:.0f} GiB reserved", \
+        f"system/{nc_total_gib:.0f}G"
 
 
 def check_uptime():
@@ -166,25 +170,29 @@ def check_storage_mount():
 
 
 def check_storage_capacity():
-    """df-derived used / total. Total = the --capacity passed to `juicefs format`."""
+    """df-derived used / total. Total = the --capacity passed to `juicefs format`.
+
+    Returns a 4-tuple; the 4th element is a dynamic name (`jfs/{total}G`)
+    that encodes the filesystem capacity in the row label.
+    """
     try:
         r = subprocess.run(
             ["df", "-B1", "/storage"],
             capture_output=True, text=True, timeout=2,
         )
     except subprocess.TimeoutExpired:
-        return "CRIT", "frozen", "/storage df timed out"
+        return "CRIT", "frozen", "/storage df timed out", None
     if r.returncode != 0:
-        return "CRIT", "df fail", f"/storage df failed: {r.stderr.strip()}"
+        return "CRIT", "df fail", f"/storage df failed: {r.stderr.strip()}", None
     lines = r.stdout.strip().splitlines()
     if len(lines) < 2:
-        return "CRIT", "df fail", f"/storage df: unexpected output: {r.stdout!r}"
+        return "CRIT", "df fail", f"/storage df: unexpected output: {r.stdout!r}", None
     fields = lines[1].split()
     try:
         total = int(fields[1])
         used = int(fields[2])
     except (IndexError, ValueError):
-        return "CRIT", "df fail", f"/storage df: unparseable: {lines[1]!r}"
+        return "CRIT", "df fail", f"/storage df: unparseable: {lines[1]!r}", None
     pct = used / total * 100 if total else 0.0
     used_gib = used / (1024 ** 3)
     total_gib = total / (1024 ** 3)
@@ -194,25 +202,31 @@ def check_storage_capacity():
         status = "WARN"
     else:
         status = "OK"
-    return status, f"{pct:.0f}%", \
-        f"/storage capacity {pct:.0f}% used ({used_gib:.0f} of {total_gib:.0f} GiB)"
+    return status, f"{used_gib:.1f} GiB", \
+        f"/storage {used_gib:.1f}/{total_gib:.0f} GiB used ({pct:.0f}%)", \
+        f"jfs/{total_gib:.0f}G"
 
 
 def check_cache_size(metrics, cache_cap):
-    """Local block-cache size. Informational — near-full is normal LRU."""
+    """Local block-cache size. Informational — near-full is normal LRU.
+
+    Returns a 4-tuple; the 4th element is a dynamic name (`cache/{cap}G`)
+    that encodes the cache cap in the row label.
+    """
     if metrics is None:
-        return "SKIP", "n/a", "cache (metrics unreachable)"
+        return "SKIP", "n/a", "cache (metrics unreachable)", None
     size = metrics.get("juicefs_blockcache_bytes")
     if size is None:
-        return "SKIP", "n/a", "cache (juicefs_blockcache_bytes metric missing)"
+        return "SKIP", "n/a", "cache (juicefs_blockcache_bytes metric missing)", None
     size_gib = size / (1024 ** 3)
     if cache_cap is None:
         return "OK", f"{size_gib:.1f} GiB", \
-            f"cache {size_gib:.1f} GiB (cap unknown)"
+            f"cache {size_gib:.1f} GiB (cap unknown)", None
     cap_gib = cache_cap / (1024 ** 3)
     pct = size / cache_cap * 100
     return "OK", f"{size_gib:.1f} GiB", \
-        f"cache {size_gib:.1f}/{cap_gib:.0f} GiB ({pct:.0f}% of cap, near-full is normal)"
+        f"cache {size_gib:.1f}/{cap_gib:.0f} GiB ({pct:.0f}% of cap, near-full is normal)", \
+        f"cache/{cap_gib:.0f}G"
 
 
 def check_rawstaging(metrics):
@@ -579,13 +593,24 @@ def _build_check_list(metrics, cache_cap):
 
 
 def run_local():
-    """Run all local checks. Returns list of dicts."""
+    """Run all local checks. Returns list of dicts.
+
+    Check functions return a 3-tuple (status, short, full) or a 4-tuple
+    that adds a dynamic name override; the override lets a check encode a
+    capacity figure into its row label (e.g. `system/32G`, `jfs/1000G`).
+    """
     metrics = _scrape_metrics()
     cache_cap = _get_cache_cap_bytes()
     rows = []
     for section, name, fn in _build_check_list(metrics, cache_cap):
-        status, short, full = fn()
-        rows.append({"section": section, "name": name,
+        result = fn()
+        if len(result) == 4:
+            status, short, full, name_override = result
+            display_name = name_override or name
+        else:
+            status, short, full = result
+            display_name = name
+        rows.append({"section": section, "name": display_name,
                      "status": status, "short": short, "full": full})
     return rows
 
