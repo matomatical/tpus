@@ -1586,6 +1586,81 @@ rsyncs in parallel with progress lines, then flips the passwd entry and
 verifies `sudo -u <user> -i pwd` on each node. The manual checklist below
 documents the same steps in case you ever need to do it by hand.
 
+### POSIX ACLs
+
+POSIX ACLs are enabled on the `clusterhome` volume so users can grant
+read or execute access to specific co-users on a per-directory basis,
+including via *default ACLs* so newly-created files inherit the grant.
+Without ACLs the only sharing mechanism is `/storage/shared/` (see the
+user handbook) — fine for one-off drops, awkward for ongoing
+collaboration on a live workspace. ACLs are opt-in per path; users who
+don't run `setfacl` see no change.
+
+Volume state after enablement:
+
+- `EnableACL: true` (set 2026-05-17).
+- `MinClientVersion: 1.2.0-A` — JuiceFS bumps this automatically when
+  `--enable-acl` is set, since older clients would interfere with ACL
+  bookkeeping. PPA clients are on 1.3.1; the bump just guards against
+  an accidental downgrade.
+
+#### Enabling ACLs (already done on this cluster)
+
+If re-provisioning from scratch, install the `acl` userspace tools on
+every node (for `setfacl`/`getfacl`):
+
+```
+for t in 0 1 2 3; do
+  ssh tpu$t 'sudo apt-get update && sudo apt-get install -y acl'
+done
+```
+
+Then flip the volume-level flag from tpu0. **Irreversible** per JuiceFS:
+`EnableACL` can be turned on but never off again.
+
+```
+sudo bash -c '
+  . /etc/juicefs/redis.env
+  export META_PASSWORD
+  juicefs config --enable-acl --yes redis://tpu0:6379/0
+'
+```
+
+Verify with `juicefs config redis://tpu0:6379/0`; output should show
+`"EnableACL": true`.
+
+#### Picking up the flag on existing mounts
+
+`EnableACL` is read by the juicefs client at mount time and passed into
+the FUSE init handshake (`EnableAcl`, `DontUmask`, implicit xattrs — see
+`pkg/fuse/fuse.go` in `juicedata/juicefs`). The kernel-side FUSE feature
+set is fixed once the mount is established, so already-mounted clients
+will not start honouring ACL syscalls until they are remounted. On a
+node that has not yet been remounted, `setfacl` returns `Operation not
+supported`; `getfacl` continues to work (it's a read-only mode-bit
+projection).
+
+To remount, follow the busy-remount diagnostic procedure
+([above](#trouble-storage-target-is-busy-on-remount)) to find holders
+(`fuser -m /storage`, `who`), decide case by case, then per-node:
+
+```
+ssh tpu$t 'sudo systemctl restart storage.mount'
+ssh tpu$t 'mount | grep "/storage type"'   # verify FUSE re-mounted
+```
+
+Spot-check on the remounted node:
+
+```
+sudo -u nobody bash -c '
+  D=$(mktemp -d /storage/.acl-test-XXXX)
+  setfacl -d -m o:rX "$D" && setfacl -m u:nobody:rX "$D" && getfacl "$D"
+  rmdir "$D"
+'
+```
+
+`getfacl` output should show `mask::` and `default:` entries.
+
 ## Rebooting the cluster
 
 Aim for a maintenance reboot roughly monthly to clear stale processes and

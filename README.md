@@ -132,6 +132,7 @@ New user-facing features
 * [x] `tpu-handbook` command for paging the user handbook from the shell.
 * [x] Plain `pip` outside venv gives a warning.
 * [x] `/storage/shared/` sticky-bit drop directory for inter-user file sharing.
+* [x] POSIX ACLs enabled on `/storage` for per-directory read-access grants.
 
 More backend stability improvements
 
