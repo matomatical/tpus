@@ -301,4 +301,7 @@ Secondary places worth a note (lower priority):
 The upstream OpenSSH project itself doesn't carry the patched code
 path, so a mindrot.org bug isn't appropriate.
 
-(Open: Matt to file when ready.)
+**Status:** Investigation continued in
+[`matomatical/bug-libunwind`](https://github.com/matomatical/bug-libunwind),
+where a more reliable C reproducer was developed and the vulnerability
+was reported privately to the libunwind maintainers.
