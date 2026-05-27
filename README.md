@@ -152,6 +152,30 @@ More backend stability improvements
 * [x] tpu-health: storage rows show absolute GiB with capacity in the label
   (`system/32G`, `cache/65G`, `jfs/1000G`) instead of percentages.
 
+### May 27 2026: Decommission
+
+TRC declined to extend the allocation. Cluster wound down in a single
+morning session.
+
+* [x] Stop background services (heartbeat, dashboard, metrics, juicefs
+  timers) to freeze state.
+* [x] Per-user filtering pass: cruft and venvs deleted, repos audited
+  and pushed, research outputs preserved or selectively dropped.
+  Notable: `dz` checkpoints pruned 407G → 16G keeping last step per
+  experiment.
+* [x] Agent state factored out into `matomatical/agents` repo via
+  symlink: `~/.claude` and `~/.gemini` → `~/agents/state/<tool>-<host>-<user>/`.
+  Set up for both matt and mfr accounts.
+* [x] `juicefs gc --delete --compact`: bucket 742 GiB → 353 GiB. Final
+  metadata dump captured.
+* [x] JuiceFS cleanly unmounted on all 4 VMs.
+* [x] Revival procedure documented (`admin-handbook.md` → "Revival on
+  a fresh VM (post-decommission)"). Bucket and SA key preserved.
+* [x] Carry-forward notes for the next setup at
+  `issues/decommission-notes.md`.
+* [ ] Delete TPU VMs via GCP console.
+* [ ] Downgrade bucket storage class to Coldline/Archive post-shutdown.
+
 ### Future:
 
 Major feature: TPU queueing system (prerequisite, persistent shared storage)

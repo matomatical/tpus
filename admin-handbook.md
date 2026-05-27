@@ -1483,6 +1483,62 @@ fresh db (e.g. db 15 for a test) and inspect first.
 End-to-end recovery test (validated 2026-04-25): load = 33s, fsck = 60s,
 rc=0, 688K blocks / 662K slices / ~150 GB consistent.
 
+#### Revival on a fresh VM (post-decommission)
+
+If the cluster is gone but the data needs to be read later, the
+filesystem can be revived on any VM with internet access. The pieces
+that must survive are:
+
+1. The bucket `gs://mfrs-tpu-cluster/` (chunks under `clusterhome/`,
+   metadata dumps under `backups/`).
+2. The SA key (`tpu-juicefs@ace-line-457306-p7.iam.gserviceaccount.com`)
+   with object-admin access to the bucket. A copy lives in
+   `secrets/tpu-juicefs-sa-private-key.json` in this repo (gitignored)
+   and was relocated off-cluster at decommission.
+
+Sketch (on a fresh small VM — `e2-small` is plenty, any region):
+
+```
+# Prereqs
+sudo apt update && sudo apt install -y redis-server rclone
+
+# JuiceFS binary (match the version the cluster used: see issues/storage/)
+curl -fsSL https://d.juicefs.com/install | sh -
+
+# SA key + rclone config
+sudo install -d -m 0750 /etc/juicefs
+sudo install -m 0640 ./sa-private-key.json /etc/juicefs/sa-private-key.json
+sudo install -d -m 0755 /etc/rclone
+sudo tee /etc/rclone/juicefs-backup.conf > /dev/null <<'EOF'
+[gcs]
+type = google cloud storage
+service_account_file = /etc/juicefs/sa-private-key.json
+bucket_policy_only = true
+EOF
+sudo chmod 0640 /etc/rclone/juicefs-backup.conf
+
+# Restore latest metadata dump into local Redis db 0
+export GOOGLE_APPLICATION_CREDENTIALS=/etc/juicefs/sa-private-key.json
+LATEST=$(sudo rclone --config=/etc/rclone/juicefs-backup.conf \
+         lsf --files-only gcs:mfrs-tpu-cluster/backups/ | sort | tail -1)
+sudo rclone --config=/etc/rclone/juicefs-backup.conf cat \
+     "gcs:mfrs-tpu-cluster/backups/${LATEST}" \
+   | gunzip \
+   | juicefs load redis://localhost:6379/0
+juicefs fsck redis://localhost:6379/0
+
+# Mount and access
+sudo mkdir -p /storage
+sudo juicefs mount redis://localhost:6379/0 /storage -d -o allow_other
+ls /storage/home/
+```
+
+The revival VM doesn't need to be set up like the original cluster —
+no cluster networking, no password on the local Redis, no
+`storage.mount` systemd unit. When done, `juicefs umount /storage`,
+delete the VM. The bucket and SA key are the only things that need
+to keep existing.
+
 ### Maintenance: gc, fsck, and the deletion model (tpu0 only)
 
 JuiceFS deletion happens in three layers; understanding which layer you're
